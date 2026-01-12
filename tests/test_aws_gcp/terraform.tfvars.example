@@ -1,0 +1,43 @@
+# Aviatrix Controller Configuration
+aviatrix_controller_ip       = "1.2.3.4"
+aviatrix_controller_username = "admin"
+aviatrix_controller_password = "your-password"
+
+# Aviatrix Access Account Names (must be pre-configured in controller)
+aviatrix_aws_access_account = "aws-account"
+aviatrix_gcp_access_account = "gcp-account"
+
+# AWS Configuration
+aws_access_key = "AKIA..."
+aws_secret_key = "your-secret-key"
+
+# GCP Configuration
+gcp_project_name             = "your-project-id"
+gcp_region                   = "us-west1"
+gcp_credential_file_location = "/path/to/credentials.json"
+
+# AWS Site Configuration (for site/aws module)
+# Add/remove sites by editing this map
+# Supported regions: us-west-2, us-east-1, eu-west-1, ap-southeast-1
+sites = {
+  "site-1" = { region = "us-west-2", cidr = "10.11.0.0/16" }
+  "site-2" = { region = "us-west-2", cidr = "10.12.0.0/16" }
+  # Example: Add more sites in different regions
+  # "site-3" = { region = "us-east-1", cidr = "10.13.0.0/16" }
+  # "site-4" = { region = "eu-west-1", cidr = "10.14.0.0/16" }
+}
+
+# Transit Network CIDRs (defaults shown - customize as needed)
+# aws_transit_cidr = "10.10.0.0/16"  # Aviatrix Transit VPC
+# gcp_transit_cidr = "10.20.0.0/16"  # Aviatrix Transit VPC
+# gcp_vm_cidr      = "10.22.0.0/24"  # GCP VM VPC
+
+# BGP ASN Configuration (defaults shown - customize as needed)
+# aws_transit_asn = 65001  # BGP ASN for AWS Aviatrix Transit
+# gcp_transit_asn = 65002  # BGP ASN for GCP Aviatrix Transit
+
+# Resource naming prefix
+name_prefix = "e2e-spoke"
+
+# HA Configuration (default: false for cost savings in test)
+# ha_gw = false
