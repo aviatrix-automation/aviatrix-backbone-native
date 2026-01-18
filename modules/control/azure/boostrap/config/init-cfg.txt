@@ -1,5 +1,5 @@
 type=dhcp-client
-hostname=pan-fw
+hostname=pan-fw-xxxxx
 dns-primary=168.63.129.16
 dns-secondary=8.8.8.8
 op-command-modes=mgmt-interface-swap

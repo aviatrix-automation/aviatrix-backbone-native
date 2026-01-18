@@ -63,6 +63,9 @@ variable "transits" {
     egress_source_ranges   = optional(list(string), ["0.0.0.0/0"])
     mgmt_source_ranges     = optional(list(string), ["0.0.0.0/0"])
     lan_source_ranges      = optional(list(string), ["0.0.0.0/0"])
+    enable_password_auth   = optional(bool, false)
+    admin_username         = optional(string, "panadmin")
+    admin_password         = optional(string, "Avtx1234#")
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
@@ -103,4 +106,10 @@ variable "vwan_hubs" {
     azure_asn                              = optional(number, 65515)
   }))
   default = {}
+}
+
+variable "tags" {
+  description = "Map of tags to apply to all resources."
+  type        = map(string)
+  default     = {}
 }

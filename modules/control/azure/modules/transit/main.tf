@@ -207,6 +207,9 @@ locals {
         egress_source_ranges   = transit.egress_source_ranges
         mgmt_source_ranges     = transit.mgmt_source_ranges
         lan_source_ranges      = transit.lan_source_ranges
+        enable_password_auth   = transit.enable_password_auth
+        admin_username         = transit.admin_username
+        admin_password         = transit.admin_password
       }],
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         transit_key            = transit_key
@@ -223,6 +226,9 @@ locals {
         egress_source_ranges   = transit.egress_source_ranges
         mgmt_source_ranges     = transit.mgmt_source_ranges
         lan_source_ranges      = transit.lan_source_ranges
+        enable_password_auth   = transit.enable_password_auth
+        admin_username         = transit.admin_username
+        admin_password         = transit.admin_password
       }]
     )
   ])
@@ -233,12 +239,14 @@ resource "azurerm_resource_group" "vwan_rg" {
   for_each = { for k, v in var.vwan_configs : k => v if !v.existing }
   name     = "rg-${lower(each.key)}"
   location = each.value.location
+  tags     = var.tags
 }
 
 resource "azurerm_resource_group" "transit_rg" {
   for_each = var.transits
   name     = "rg-transit-${lower(each.key)}-${lower(replace(var.region, " ", ""))}"
   location = var.region
+  tags     = var.tags
 }
 
 resource "azurerm_resource_group" "vnet_rg" {
@@ -248,6 +256,7 @@ resource "azurerm_resource_group" "vnet_rg" {
   }
   name     = "rg-vnet-${lower(each.key)}-${lower(replace(var.region, " ", ""))}"
   location = var.region
+  tags     = var.tags
 }
 
 resource "azurerm_virtual_wan" "vwan" {
@@ -256,6 +265,7 @@ resource "azurerm_virtual_wan" "vwan" {
   resource_group_name = azurerm_resource_group.vwan_rg[each.key].name
   location            = each.value.location
   type                = "Standard"
+  tags                = var.tags
   depends_on          = [azurerm_resource_group.vwan_rg]
 }
 
@@ -265,6 +275,7 @@ resource "azurerm_virtual_network" "vnet" {
   resource_group_name = azurerm_resource_group.vnet_rg[each.key].name
   location            = var.region
   address_space       = [each.value.cidr]
+  tags                = var.tags
 }
 
 resource "azurerm_subnet" "private_subnet" {
@@ -310,6 +321,7 @@ resource "azurerm_route_table" "private_route_table" {
   name                = "rt-${each.key}-private"
   location            = var.region
   resource_group_name = azurerm_resource_group.vnet_rg[each.key].name
+  tags                = var.tags
 }
 
 resource "azurerm_route" "private_default_null" {
@@ -341,6 +353,7 @@ resource "azurerm_virtual_hub" "hub" {
   )
   address_prefix                         = each.value.virtual_hub_cidr
   virtual_router_auto_scale_min_capacity = each.value.virtual_router_auto_scale_min_capacity
+  tags                                   = var.tags
   depends_on                             = [azurerm_virtual_wan.vwan, azurerm_resource_group.vwan_rg, data.azurerm_virtual_wan.existing_vwan, data.azurerm_resource_group.existing_vwan_rg]
 }
 
@@ -392,6 +405,7 @@ module "mc-transit" {
   insane_mode                   = true
   resource_group                = azurerm_resource_group.transit_rg[each.key].name
   bgp_lan_interfaces_count      = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
+  tags                          = var.tags
 }
 
 resource "aviatrix_firenet" "firenet" {
@@ -414,6 +428,7 @@ resource "azurerm_network_security_group" "pan_mgmt" {
   name                = "${each.key}-mgmt-nsg"
   location            = var.region
   resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+  tags                = var.tags
 
   security_rule {
     name                       = "Allow-HTTPS"
@@ -476,6 +491,7 @@ resource "azurerm_network_security_group" "pan_egress" {
   name                = "${each.key}-egress-nsg"
   location            = var.region
   resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+  tags                = var.tags
 
   security_rule {
     name                       = "Allow-Inbound"
@@ -514,6 +530,7 @@ resource "azurerm_network_security_group" "pan_lan" {
   name                = "${each.key}-lan-nsg"
   location            = var.region
   resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+  tags                = var.tags
 
   security_rule {
     name                       = "Allow-Internal"
@@ -574,9 +591,12 @@ module "pan_fw" {
   name                = each.key
   region              = var.region
   resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+  tags                = var.tags
 
   authentication = {
-    disable_password_authentication = true
+    disable_password_authentication = !each.value.enable_password_auth
+    username                        = each.value.enable_password_auth ? each.value.admin_username : null
+    password                        = each.value.enable_password_auth ? each.value.admin_password : null
     ssh_keys                        = each.value.ssh_keys
   }
 
@@ -589,10 +609,13 @@ module "pan_fw" {
     size      = each.value.fw_instance_size
     disk_name = "${each.key}-disk"
 
-    bootstrap_options = jsonencode({
-      storage_account_name               = module.bootstrap[each.key].storage_account_name
-      storage_account_primary_access_key = module.bootstrap[each.key].storage_account_primary_access_key
-    })
+    bootstrap_options = join(";", [
+      "type=dhcp-client",
+      "storage-account=${module.bootstrap[each.key].storage_account_name}",
+      "access-key=${module.bootstrap[each.key].storage_account_primary_access_key}",
+      "file-share=${each.value.file_shares[keys(each.value.file_shares)[0]].name}",
+      "share-directory=None"
+    ])
 
   }
 
@@ -728,6 +751,7 @@ module "mc-spoke" {
   enable_bgp_over_lan      = try(each.value.enable_bgp, false) ? true : null
   bgp_lan_interfaces_count = try(each.value.enable_bgp, false) ? 1 : null
   inspection               = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
+  tags                     = var.tags
 
   depends_on = [azurerm_resource_group.vnet_rg, module.mc-transit]
 
