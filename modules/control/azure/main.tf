@@ -12,6 +12,7 @@ module "transit" {
       local_as_number        = 65001
       fw_amount              = 2
       firewall_image_version = "11.2.5"
+      fw_instance_size       = "Standard_D3_v2"
       vwan_connections = [
         {
           vwan_name     = "vwan-infra"
@@ -19,6 +20,12 @@ module "transit" {
         }
       ]
       ssh_keys = ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDa2Kz319A3dBeV/bBj5825OGarV5E6zyl70fa3SB2zh2EEsInFY6wj2Dac6nA6vGJTIC5bZPuOhJPsCuniUI+5o4C0df9V8lEQg7PLOcqdeZ3JklfzgvFK/YhWMDQnyJcOxGidVc6ywfyv0h+rbe5V1yhNvudTbvRn84hy/e/RJALBvIT1YUfr98cY+xloH0d/5wWIVtNj37xbwNDA4Eg2qO+84rBHGsIYS6wT+qXNH0IDW2SPQxmnIvf6Sweh2VnlFfn+/lcHhI7XcdjMsYFAKZjdu3ylnWLtbJw4FAY5rL0Q/OAako7pz3OFgGR2al6o/cYVxXjqsfz3yL6Ez32j ricardotrentin@Mac.attlocal.net"]
+      file_shares = {
+        "bootstrap" = {
+          name                   = "bootstrap"
+          bootstrap_package_path = "${path.module}/boostrap"
+        }
+      }
     }
   }
 

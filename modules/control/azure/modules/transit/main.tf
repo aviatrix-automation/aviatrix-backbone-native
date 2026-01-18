@@ -204,6 +204,9 @@ locals {
         inspection_enabled     = transit.inspection_enabled
         ssh_keys               = transit.ssh_keys
         file_shares            = transit.file_shares
+        egress_source_ranges   = transit.egress_source_ranges
+        mgmt_source_ranges     = transit.mgmt_source_ranges
+        lan_source_ranges      = transit.lan_source_ranges
       }],
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         transit_key            = transit_key
@@ -217,6 +220,9 @@ locals {
         inspection_enabled     = transit.inspection_enabled
         ssh_keys               = transit.ssh_keys
         file_shares            = transit.file_shares
+        egress_source_ranges   = transit.egress_source_ranges
+        mgmt_source_ranges     = transit.mgmt_source_ranges
+        lan_source_ranges      = transit.lan_source_ranges
       }]
     )
   ])
@@ -398,6 +404,144 @@ resource "aviatrix_firenet" "firenet" {
   egress_enabled     = each.value.egress_enabled
 }
 
+# NSG for PAN Management Interface
+resource "azurerm_network_security_group" "pan_mgmt" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  name                = "${each.key}-mgmt-nsg"
+  location            = var.region
+  resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+
+  security_rule {
+    name                       = "Allow-HTTPS"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefixes    = each.value.mgmt_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-SSH"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefixes    = each.value.mgmt_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-Panorama"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3978"
+    source_address_prefixes    = each.value.mgmt_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-ICMP"
+    priority                   = 130
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Icmp"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefixes    = each.value.mgmt_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  depends_on = [module.mc-transit]
+}
+
+# NSG for PAN Egress Interface
+resource "azurerm_network_security_group" "pan_egress" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  name                = "${each.key}-egress-nsg"
+  location            = var.region
+  resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+
+  security_rule {
+    name                       = "Allow-Inbound"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefixes    = each.value.egress_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-Outbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  depends_on = [module.mc-transit]
+}
+
+# NSG for PAN LAN Interface
+resource "azurerm_network_security_group" "pan_lan" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  name                = "${each.key}-lan-nsg"
+  location            = var.region
+  resource_group_name = module.mc-transit[each.value.transit_key].vpc.resource_group
+
+  security_rule {
+    name                       = "Allow-Internal"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefixes    = each.value.lan_source_ranges
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-Outbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  depends_on = [module.mc-transit]
+}
+
 
 module "bootstrap" {
 
@@ -494,6 +638,39 @@ module "pan_fw" {
     module.mc-transit,
   ]
 
+}
+
+# NSG Association for PAN Management Interface
+resource "azurerm_network_interface_security_group_association" "pan_mgmt" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  network_interface_id      = module.pan_fw[each.key].interfaces["${each.key}-mgmt"].id
+  network_security_group_id = azurerm_network_security_group.pan_mgmt[each.key].id
+}
+
+# NSG Association for PAN Egress Interface
+resource "azurerm_network_interface_security_group_association" "pan_egress" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  network_interface_id      = module.pan_fw[each.key].interfaces["${each.key}-egress"].id
+  network_security_group_id = azurerm_network_security_group.pan_egress[each.key].id
+}
+
+# NSG Association for PAN LAN Interface
+resource "azurerm_network_interface_security_group_association" "pan_lan" {
+  for_each = {
+    for fw in local.fws :
+    "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+  }
+
+  network_interface_id      = module.pan_fw[each.key].interfaces["${each.key}-lan"].id
+  network_security_group_id = azurerm_network_security_group.pan_lan[each.key].id
 }
 
 resource "aviatrix_firewall_instance_association" "fw_associations" {

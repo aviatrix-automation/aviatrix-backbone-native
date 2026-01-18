@@ -60,9 +60,9 @@ variable "transits" {
     inspection_enabled     = optional(bool, false)
     egress_enabled         = optional(bool, false)
     ssh_keys               = optional(list(string), [])
-    egress_source_ranges   = optional(string, "")
-    mgmt_source_ranges     = optional(string, "")
-    lan_source_ranges      = optional(string, "")
+    egress_source_ranges   = optional(list(string), ["0.0.0.0/0"])
+    mgmt_source_ranges     = optional(list(string), ["0.0.0.0/0"])
+    lan_source_ranges      = optional(list(string), ["0.0.0.0/0"])
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
