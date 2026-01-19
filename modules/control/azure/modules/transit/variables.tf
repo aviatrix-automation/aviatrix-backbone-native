@@ -79,6 +79,10 @@ variable "transits" {
     admin_username         = optional(string, "panadmin")
     admin_password         = optional(string, "Avtx1234#")
     bootstrap_type         = optional(string, "file_share") # "file_share" or "panorama"
+    # Per-transit Panorama overrides (uses global panorama_config if not set)
+    panorama_dgname        = optional(string) # Override device group for this transit
+    panorama_tplname       = optional(string) # Override template stack for this transit
+    panorama_cgname        = optional(string) # Override collector group for this transit
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
@@ -151,11 +155,22 @@ variable "panorama_config" {
     tplname            = string
     dgname             = string
     vm_auth_key        = string
-    auth_key_ttl       = optional(string, "8760") # Default to 1 year in hours
-    cgname             = optional(string)          # Collector group name
-    plugin_op_commands = optional(string)          # Plugin operational commands
+    auth_key_ttl       = optional(string, "8760")      # Default to 1 year in hours
+    cgname             = optional(string)               # Collector group name
+    plugin_op_commands = optional(string)               # Plugin operational commands
+    # Azure-specific options
+    enable_dpdk        = optional(bool, true)           # Enable DPDK for accelerated networking
+    mgmt_interface_swap = optional(bool, true)          # Swap management interface (required for Azure)
+    # CSP plugin options for Azure metadata integration
+    csp_pinid          = optional(string)               # CSP PIN ID (for PAYG licensing)
+    csp_pinvalue       = optional(string)               # CSP PIN value
   })
   default = null
+
+  validation {
+    condition     = var.panorama_config == null || (var.panorama_config.tplname != "" && var.panorama_config.dgname != "")
+    error_message = "panorama_config.tplname and panorama_config.dgname must not be empty when panorama_config is provided."
+  }
 }
 
 variable "tags" {

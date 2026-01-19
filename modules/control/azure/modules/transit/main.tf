@@ -1,4 +1,13 @@
 locals {
+  # Validation: Ensure panorama_config is provided when any transit uses panorama bootstrap
+  _validate_panorama_config = [
+    for k, v in var.transits : (
+      v.bootstrap_type == "panorama" && var.panorama_config == null
+      ? file("ERROR: panorama_config must be provided when bootstrap_type is 'panorama' (transit: ${k})")
+      : true
+    ) if v.fw_amount > 0
+  ]
+
   stripped_names = {
     for k, v in merge(var.transits) : k => (
       length(regexall("^(.+)-vnet$", k)) > 0 ?
@@ -211,6 +220,10 @@ locals {
         enable_password_auth   = transit.enable_password_auth
         admin_username         = transit.admin_username
         admin_password         = transit.admin_password
+        # Per-transit Panorama overrides
+        panorama_dgname        = transit.panorama_dgname
+        panorama_tplname       = transit.panorama_tplname
+        panorama_cgname        = transit.panorama_cgname
       }],
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         transit_key            = transit_key
@@ -231,6 +244,10 @@ locals {
         enable_password_auth   = transit.enable_password_auth
         admin_username         = transit.admin_username
         admin_password         = transit.admin_password
+        # Per-transit Panorama overrides
+        panorama_dgname        = transit.panorama_dgname
+        panorama_tplname       = transit.panorama_tplname
+        panorama_cgname        = transit.panorama_cgname
       }]
     )
   ])
@@ -636,20 +653,33 @@ module "pan_fw" {
     size      = each.value.fw_instance_size
     disk_name = "${each.key}-disk"
 
+    # Bootstrap options based on bootstrap_type
+    # Panorama: Dynamic registration with Panorama for centralized management
+    # File Share: Static configuration from Azure File Share
     bootstrap_options = each.value.bootstrap_type == "panorama" ? join(";", compact([
       "type=dhcp-client",
-      "hostname=${each.key}",
+      # Hostname includes region for better Panorama identification
+      "hostname=${each.key}-${lower(replace(var.region, " ", ""))}",
+      # Panorama server configuration
       "panorama-server=${data.aws_ssm_parameter.panorama_public_ip[0].value}",
       var.panorama_config.panorama_server2 != null ? "panorama-server-2=${var.panorama_config.panorama_server2}" : "",
+      # DNS configuration
       "dns-primary=${var.dns_primary}",
       "dns-secondary=${var.dns_secondary}",
-      "tplname=${var.panorama_config.tplname}",
-      "dgname=${var.panorama_config.dgname}",
+      # Template and Device Group (per-transit override or global)
+      "tplname=${coalesce(each.value.panorama_tplname, var.panorama_config.tplname)}",
+      "dgname=${coalesce(each.value.panorama_dgname, var.panorama_config.dgname)}",
+      # Authentication and licensing
       "vm-auth-key=${data.aws_ssm_parameter.vm_auth_key[0].value}",
       "vm-series-auto-registration-pin-id=${data.aws_ssm_parameter.palo_alto_pin_id[0].value}",
       "vm-series-auto-registration-pin-value=${data.aws_ssm_parameter.palo_alto_pin_value[0].value}",
       "authcodes=${data.aws_ssm_parameter.palo_alto_authcode[0].value}",
-      var.panorama_config.cgname != null ? "cgname=${var.panorama_config.cgname}" : "",
+      # Collector group (per-transit override or global)
+      coalesce(each.value.panorama_cgname, var.panorama_config.cgname) != null ? "cgname=${coalesce(each.value.panorama_cgname, var.panorama_config.cgname)}" : "",
+      # Azure-specific optimizations
+      var.panorama_config.mgmt_interface_swap ? "op-command-modes=mgmt-interface-swap" : "",
+      var.panorama_config.enable_dpdk ? "op-cmd-dpdk-pkt-io=on" : "",
+      # Plugin operational commands
       var.panorama_config.plugin_op_commands != null ? "plugin-op-commands=${var.panorama_config.plugin_op_commands}" : ""
     ])) : join(";", [
       "type=dhcp-client",
