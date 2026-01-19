@@ -85,11 +85,13 @@ variable "transits" {
 variable "spokes" {
   description = "Map of spoke gateway configurations for Aviatrix."
   type = map(object({
-    account         = string
-    cidr            = string
-    instance_size   = string
-    enable_bgp      = optional(bool, false)
-    local_as_number = optional(number)
+    account                          = string
+    cidr                             = string
+    instance_size                    = string
+    enable_bgp                       = optional(bool, false)
+    local_as_number                  = optional(number)
+    included_advertised_spoke_routes = optional(string)        # CIDRs to advertise to transit (comma-separated)
+    spoke_bgp_manual_advertise_cidrs = optional(list(string))  # CIDRs to advertise to BGP peers
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string

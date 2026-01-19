@@ -731,27 +731,29 @@ resource "aviatrix_firewall_instance_association" "fw_associations" {
 }
 
 module "mc-spoke" {
-  for_each                 = var.spokes
-  source                   = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version                  = "8.0.0"
-  account                  = each.value.account
-  az_support               = false
-  cloud                    = "azure"
-  cidr                     = each.value.cidr
-  region                   = var.region
-  instance_size            = each.value.instance_size
-  name                     = each.key
-  gw_name                  = local.stripped_spoke_names[each.key]
-  local_as_number          = try(each.value.enable_bgp, false) ? each.value.local_as_number : null
-  bgp_ecmp                 = try(each.value.enable_bgp, false) ? true : null
-  insane_mode              = true
-  resource_group           = azurerm_resource_group.vnet_rg[each.key].name
-  transit_gw               = local.spoke_transit_gw[each.key]
-  enable_bgp               = try(each.value.enable_bgp, false)
-  enable_bgp_over_lan      = try(each.value.enable_bgp, false) ? true : null
-  bgp_lan_interfaces_count = try(each.value.enable_bgp, false) ? 1 : null
-  inspection               = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
-  tags                     = var.tags
+  for_each                          = var.spokes
+  source                            = "terraform-aviatrix-modules/mc-spoke/aviatrix"
+  version                           = "8.0.0"
+  account                           = each.value.account
+  az_support                        = false
+  cloud                             = "azure"
+  cidr                              = each.value.cidr
+  region                            = var.region
+  instance_size                     = each.value.instance_size
+  name                              = each.key
+  gw_name                           = local.stripped_spoke_names[each.key]
+  local_as_number                   = try(each.value.enable_bgp, false) ? each.value.local_as_number : null
+  bgp_ecmp                          = try(each.value.enable_bgp, false) ? true : null
+  insane_mode                       = true
+  resource_group                    = azurerm_resource_group.vnet_rg[each.key].name
+  transit_gw                        = local.spoke_transit_gw[each.key]
+  enable_bgp                        = try(each.value.enable_bgp, false)
+  enable_bgp_over_lan               = try(each.value.enable_bgp, false) ? true : null
+  bgp_lan_interfaces_count          = try(each.value.enable_bgp, false) ? 1 : null
+  included_advertised_spoke_routes  = each.value.included_advertised_spoke_routes
+  spoke_bgp_manual_advertise_cidrs  = each.value.spoke_bgp_manual_advertise_cidrs
+  inspection                        = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
+  tags                              = var.tags
 
   depends_on = [azurerm_resource_group.vnet_rg, module.mc-transit]
 
