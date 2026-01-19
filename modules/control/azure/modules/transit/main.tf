@@ -317,7 +317,7 @@ resource "azurerm_subnet" "public_subnet" {
 }
 
 resource "azurerm_route_table" "private_route_table" {
-  for_each            = { for k, v in var.vnets : k => v if !try(v.existing, false) && try(length(v.private_subnets), 0) > 0 }
+  for_each            = { for k, v in var.vnets : k => v if !try(v.existing, false) && try(length(v.private_subnets), 0) > 0 && try(v.vwan_hub_name, "") == "" }
   name                = "rt-${each.key}-private"
   location            = var.region
   resource_group_name = azurerm_resource_group.vnet_rg[each.key].name
@@ -325,7 +325,7 @@ resource "azurerm_route_table" "private_route_table" {
 }
 
 resource "azurerm_route" "private_default_null" {
-  for_each            = { for k, v in var.vnets : k => v if !try(v.existing, false) && try(length(v.private_subnets), 0) > 0 }
+  for_each            = { for k, v in var.vnets : k => v if !try(v.existing, false) && try(length(v.private_subnets), 0) > 0 && try(v.vwan_hub_name, "") == "" }
   name                = "default-to-null"
   resource_group_name = azurerm_resource_group.vnet_rg[each.key].name
   route_table_name    = azurerm_route_table.private_route_table[each.key].name
@@ -334,9 +334,29 @@ resource "azurerm_route" "private_default_null" {
 }
 
 resource "azurerm_subnet_route_table_association" "private_subnet_association" {
-  for_each       = azurerm_subnet.private_subnet
+  for_each = {
+    for k, v in azurerm_subnet.private_subnet : k => v
+    if try(var.vnets[split("-private-", k)[0]].vwan_hub_name, "") == ""
+  }
   subnet_id      = each.value.id
   route_table_id = azurerm_route_table.private_route_table[split("-private-", each.key)[0]].id
+}
+
+resource "azurerm_route_table" "public_route_table" {
+  for_each            = { for k, v in var.vnets : k => v if !try(v.existing, false) && try(length(v.public_subnets), 0) > 0 && try(v.vwan_hub_name, "") == "" }
+  name                = "rt-${each.key}-public"
+  location            = var.region
+  resource_group_name = azurerm_resource_group.vnet_rg[each.key].name
+  tags                = var.tags
+}
+
+resource "azurerm_subnet_route_table_association" "public_subnet_association" {
+  for_each = {
+    for k, v in azurerm_subnet.public_subnet : k => v
+    if try(var.vnets[split("-public-", k)[0]].vwan_hub_name, "") == ""
+  }
+  subnet_id      = each.value.id
+  route_table_id = azurerm_route_table.public_route_table[split("-public-", each.key)[0]].id
 }
 
 resource "azurerm_virtual_hub" "hub" {
@@ -362,6 +382,7 @@ resource "azurerm_virtual_hub_connection" "transit_connection" {
   name                      = "${each.value.key}-to-vwan-${each.value.vwan_name}"
   virtual_hub_id            = azurerm_virtual_hub.hub[each.value.vwan_hub_name].id
   remote_virtual_network_id = each.value.type == "transit" ? "/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${module.mc-transit[each.value.key].vpc.resource_group}/providers/Microsoft.Network/virtualNetworks/${module.mc-transit[each.value.key].vpc.name}" : "/subscriptions/${data.azurerm_subscription.current.subscription_id}/resourceGroups/${module.mc-spoke[each.value.key].vpc.resource_group}/providers/Microsoft.Network/virtualNetworks/${module.mc-spoke[each.value.key].vpc.name}"
+  internet_security_enabled = var.vwan_hubs[each.value.vwan_hub_name].propagate_default_route
   routing {
     propagated_route_table {
       route_table_ids = [azurerm_virtual_hub.hub[each.value.vwan_hub_name].default_route_table_id]
@@ -375,6 +396,7 @@ resource "azurerm_virtual_hub_connection" "vnet_connection" {
   name                      = "${each.key}-to-vwan-${local.vwan_hub_to_vwan[each.value.vwan_hub_name]}"
   virtual_hub_id            = azurerm_virtual_hub.hub[each.value.vwan_hub_name].id
   remote_virtual_network_id = try(data.azurerm_virtual_network.existing_vnet[each.key].id, azurerm_virtual_network.vnet[each.key].id)
+  internet_security_enabled = var.vwan_hubs[each.value.vwan_hub_name].propagate_default_route
   routing {
     propagated_route_table {
       route_table_ids = [azurerm_virtual_hub.hub[each.value.vwan_hub_name].default_route_table_id]
@@ -401,9 +423,11 @@ module "mc-transit" {
   enable_bgp_over_lan           = true
   bgp_ecmp                      = true
   enable_segmentation           = true
-  enable_advertise_transit_cidr = true
-  insane_mode                   = true
-  resource_group                = azurerm_resource_group.transit_rg[each.key].name
+  enable_advertise_transit_cidr       = true
+  enable_multi_tier_transit            = true
+  insane_mode                          = true
+  bgp_manual_spoke_advertise_cidrs     = each.value.bgp_manual_spoke_advertise_cidrs
+  resource_group                       = azurerm_resource_group.transit_rg[each.key].name
   bgp_lan_interfaces_count      = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
   tags                          = var.tags
 }
@@ -751,7 +775,8 @@ module "mc-spoke" {
   enable_bgp_over_lan               = try(each.value.enable_bgp, false) ? true : null
   bgp_lan_interfaces_count          = try(each.value.enable_bgp, false) ? 1 : null
   included_advertised_spoke_routes  = each.value.included_advertised_spoke_routes
-  spoke_bgp_manual_advertise_cidrs  = each.value.spoke_bgp_manual_advertise_cidrs
+  enable_max_performance            = each.value.enable_max_performance
+  disable_route_propagation         = each.value.disable_route_propagation
   inspection                        = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
   tags                              = var.tags
 
@@ -762,6 +787,12 @@ module "mc-spoke" {
 resource "time_sleep" "wait_for_hub_connection" {
   count           = length(local.vwan_pairs) > 0 ? 1 : 0
   depends_on      = [azurerm_virtual_hub_connection.transit_connection, module.mc-transit]
+  create_duration = "600s"
+}
+
+resource "time_sleep" "wait_for_spoke_hub_connection" {
+  count           = length(local.spoke_vwan_pairs) > 0 ? 1 : 0
+  depends_on      = [azurerm_virtual_hub_connection.transit_connection, module.mc-spoke]
   create_duration = "600s"
 }
 
@@ -825,11 +856,12 @@ resource "aviatrix_spoke_external_device_conn" "spoke_external" {
   local_lan_ip              = each.value.bgp_lan_ips.primary
   backup_local_lan_ip       = each.value.bgp_lan_ips.ha
   enable_bgp_lan_activemesh = true
+  manual_bgp_advertised_cidrs = try(var.spokes[each.value.spoke_key].spoke_bgp_manual_advertise_cidrs, null)
   direct_connect            = false
   custom_algorithms         = false
   phase1_local_identifier   = null
   depends_on = [
-    time_sleep.wait_for_hub_connection,
+    time_sleep.wait_for_spoke_hub_connection,
     data.azurerm_virtual_network.transit_vnet,
     data.azurerm_virtual_network.spoke_vnet
   ]

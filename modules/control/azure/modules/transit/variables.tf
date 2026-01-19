@@ -58,7 +58,7 @@ variable "transits" {
     fw_instance_size       = optional(string)
     firewall_image_version = optional(string)
     inspection_enabled     = optional(bool, false)
-    egress_enabled         = optional(bool, false)
+    egress_enabled         = optional(bool, true)
     ssh_keys               = optional(list(string), [])
     egress_source_ranges   = optional(list(string), ["0.0.0.0/0"])
     mgmt_source_ranges     = optional(list(string), ["0.0.0.0/0"])
@@ -74,6 +74,7 @@ variable "transits" {
       quota                  = optional(number)
       access_tier            = optional(string)
     })))
+    bgp_manual_spoke_advertise_cidrs = optional(string)
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string
@@ -92,6 +93,8 @@ variable "spokes" {
     local_as_number                  = optional(number)
     included_advertised_spoke_routes = optional(string)        # CIDRs to advertise to transit (comma-separated)
     spoke_bgp_manual_advertise_cidrs = optional(list(string))  # CIDRs to advertise to BGP peers
+    enable_max_performance           = optional(bool, true)    # Enable maximum performance for spoke gateway
+    disable_route_propagation        = optional(bool, false)   # Disable route propagation on spoke subnets
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string
@@ -104,8 +107,9 @@ variable "vwan_hubs" {
   description = "Map of Virtual WAN hub configurations."
   type = map(object({
     virtual_hub_cidr                       = string
-    virtual_router_auto_scale_min_capacity = optional(number)
+    virtual_router_auto_scale_min_capacity = optional(number, 2)
     azure_asn                              = optional(number, 65515)
+    propagate_default_route                = optional(bool, true)  # Propagate 0.0.0.0/0 to connected VNets
   }))
   default = {}
 }
