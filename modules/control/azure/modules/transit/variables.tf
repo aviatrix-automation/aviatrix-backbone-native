@@ -10,6 +10,18 @@ variable "region" {
   type        = string
 }
 
+variable "dns_primary" {
+  description = "Primary DNS server for firewall bootstrap."
+  type        = string
+  default     = "168.63.129.16" # Azure DNS
+}
+
+variable "dns_secondary" {
+  description = "Secondary DNS server for firewall bootstrap."
+  type        = string
+  default     = "8.8.8.8"
+}
+
 
 variable "subscription_id" {
   description = "Azure subscription ID."
@@ -66,6 +78,7 @@ variable "transits" {
     enable_password_auth   = optional(bool, false)
     admin_username         = optional(string, "panadmin")
     admin_password         = optional(string, "Avtx1234#")
+    bootstrap_type         = optional(string, "file_share") # "file_share" or "panorama"
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
@@ -81,6 +94,22 @@ variable "transits" {
     })))
   }))
   default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.transits :
+      v.bootstrap_type == "file_share" || v.bootstrap_type == "panorama"
+    ])
+    error_message = "bootstrap_type must be either 'file_share' or 'panorama'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.transits :
+      v.bootstrap_type != "file_share" || v.file_shares != null
+    ])
+    error_message = "file_shares must be provided when bootstrap_type is 'file_share'."
+  }
 }
 
 variable "spokes" {
@@ -112,6 +141,21 @@ variable "vwan_hubs" {
     propagate_default_route                = optional(bool, true)  # Propagate 0.0.0.0/0 to connected VNets
   }))
   default = {}
+}
+
+variable "panorama_config" {
+  description = "Panorama configuration for dynamic bootstrap. When used, firewalls will register with Panorama for configuration management."
+  type = object({
+    panorama_server    = string
+    panorama_server2   = optional(string)
+    tplname            = string
+    dgname             = string
+    vm_auth_key        = string
+    auth_key_ttl       = optional(string, "8760") # Default to 1 year in hours
+    cgname             = optional(string)          # Collector group name
+    plugin_op_commands = optional(string)          # Plugin operational commands
+  })
+  default = null
 }
 
 variable "tags" {

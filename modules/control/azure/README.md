@@ -8,7 +8,7 @@ The module provides:
 
 - **Transit Gateways**: High-performance Aviatrix transit gateways with BGP LAN
 - **Virtual WAN Integration**: Azure vWAN with virtual hubs and BGP peering
-- **FireNet Integration**: Optional Palo Alto Networks firewall deployment with Azure File Share bootstrap
+- **FireNet Integration**: Optional Palo Alto Networks firewall deployment with Azure File Share bootstrap or dynamic Panorama bootstrap
 - **Spoke Gateways**: Aviatrix spoke gateways with optional vWAN connectivity and performance tuning
 - **VNET Management**: Create new VNETs or connect existing ones to vWAN hubs
 - **Route Control**: Configurable route advertisement, propagation, and vHub default route handling
@@ -103,6 +103,9 @@ The module provides:
 | aws_ssm_region | AWS region for SSM parameter retrieval | `string` | yes |
 | region | Azure region for deployment | `string` | yes |
 | subscription_id | Azure subscription ID | `string` | yes |
+| dns_primary | Primary DNS server for firewall bootstrap | `string` | no |
+| dns_secondary | Secondary DNS server for firewall bootstrap | `string` | no |
+| panorama_config | Panorama configuration for dynamic bootstrap | `object` | no |
 | vwan_configs | Map of Virtual WAN configurations | `map(object)` | no |
 | vwan_hubs | Map of Virtual WAN hub configurations | `map(object)` | no |
 | transits | Map of transit gateway configurations | `map(object)` | no |
@@ -137,6 +140,13 @@ vwan_hubs = {
 
 ### Transit Configuration
 
+The module supports two bootstrap methods for Palo Alto firewalls:
+
+1. **File Share Bootstrap** (default): Uses Azure File Shares for static configuration
+2. **Panorama Bootstrap**: Uses Panorama for dynamic configuration management
+
+#### File Share Bootstrap (Default)
+
 ```hcl
 transits = {
   "az-transit-vnet" = {
@@ -149,7 +159,8 @@ transits = {
     firewall_image_version           = "11.2.5"
     inspection_enabled               = true
     egress_enabled                   = true
-    bgp_manual_spoke_advertise_cidrs = "10.0.0.0/8,172.16.0.0/12"  # Optional: manually advertised CIDRs
+    bootstrap_type                   = "file_share"  # Default value
+    bgp_manual_spoke_advertise_cidrs = "10.0.0.0/8,172.16.0.0/12"
     vwan_connections = [
       {
         vwan_name     = "vwan-prod"
@@ -162,6 +173,52 @@ transits = {
         bootstrap_package_path = "path/to/package"
       }
     }
+  }
+}
+```
+
+#### Panorama Bootstrap
+
+When using Panorama bootstrap, firewalls register dynamically with Panorama for configuration management.
+
+**Required SSM Parameters:**
+- `/panorama/public_ip` - Panorama server IP address
+- `/panorama/vm_auth_key` - VM authentication key
+- `/paloalto/pin_id` - VM-Series auto-registration PIN ID
+- `/paloalto/pin_value` - VM-Series auto-registration PIN value
+- `/paloalto/authcode` - PAN-OS license authcode
+
+```hcl
+panorama_config = {
+  panorama_server    = "panorama.example.com"  # For display, actual value from SSM
+  panorama_server2   = null                     # Optional secondary Panorama
+  tplname            = "Azure-Template-Stack"   # Template stack name
+  dgname             = "Azure-Device-Group"     # Device group name
+  vm_auth_key        = "from-ssm"               # For display, actual value from SSM
+  cgname             = "Azure-Collectors"       # Optional collector group
+  plugin_op_commands = null                     # Optional plugin commands
+}
+
+transits = {
+  "az-transit-vnet" = {
+    cidr                             = "10.1.0.0/23"
+    instance_size                    = "Standard_D16_v5"
+    account                          = "azure-account"
+    local_as_number                  = 65001
+    fw_amount                        = 2
+    fw_instance_size                 = "Standard_D3_v2"
+    firewall_image_version           = "11.2.5"
+    inspection_enabled               = true
+    egress_enabled                   = true
+    bootstrap_type                   = "panorama"  # Use Panorama bootstrap
+    bgp_manual_spoke_advertise_cidrs = "10.0.0.0/8,172.16.0.0/12"
+    vwan_connections = [
+      {
+        vwan_name     = "vwan-prod"
+        vwan_hub_name = "prod"
+      }
+    ]
+    # file_shares not required for panorama bootstrap
   }
 }
 ```
@@ -245,7 +302,9 @@ Use route summarization (`bgp_manual_spoke_advertise_cidrs` or `spoke_bgp_manual
 
 - Transit and spoke gateways connect to vWAN hubs via BGP LAN
 - vWAN hubs automatically create hub-managed VNETs for BGP peering
-- Firewall bootstrap uses Azure File Shares with Palo Alto vmseries module
+- Firewall bootstrap supports two methods:
+  - **File Share**: Azure File Shares with static Palo Alto configuration (default)
+  - **Panorama**: Dynamic registration with Panorama for centralized management
 - Both new and existing VNETs can be connected to vWAN hubs
 - Spokes attached to transits with FireNet are automatically inspected
 - Resource groups are auto-created for vWAN, transit, and VNET resources

@@ -203,6 +203,7 @@ locals {
         egress_enabled         = transit.egress_enabled
         inspection_enabled     = transit.inspection_enabled
         ssh_keys               = transit.ssh_keys
+        bootstrap_type         = transit.bootstrap_type
         file_shares            = transit.file_shares
         egress_source_ranges   = transit.egress_source_ranges
         mgmt_source_ranges     = transit.mgmt_source_ranges
@@ -222,6 +223,7 @@ locals {
         egress_enabled         = transit.egress_enabled
         inspection_enabled     = transit.inspection_enabled
         ssh_keys               = transit.ssh_keys
+        bootstrap_type         = transit.bootstrap_type
         file_shares            = transit.file_shares
         egress_source_ranges   = transit.egress_source_ranges
         mgmt_source_ranges     = transit.mgmt_source_ranges
@@ -589,6 +591,7 @@ module "bootstrap" {
   for_each = {
     for fw in local.fws :
     "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+    if fw.bootstrap_type == "file_share"
   }
 
   source              = "PaloAltoNetworks/swfw-modules/azurerm//modules/bootstrap"
@@ -633,7 +636,22 @@ module "pan_fw" {
     size      = each.value.fw_instance_size
     disk_name = "${each.key}-disk"
 
-    bootstrap_options = join(";", [
+    bootstrap_options = each.value.bootstrap_type == "panorama" ? join(";", compact([
+      "type=dhcp-client",
+      "hostname=${each.key}",
+      "panorama-server=${data.aws_ssm_parameter.panorama_public_ip[0].value}",
+      var.panorama_config.panorama_server2 != null ? "panorama-server-2=${var.panorama_config.panorama_server2}" : "",
+      "dns-primary=${var.dns_primary}",
+      "dns-secondary=${var.dns_secondary}",
+      "tplname=${var.panorama_config.tplname}",
+      "dgname=${var.panorama_config.dgname}",
+      "vm-auth-key=${data.aws_ssm_parameter.vm_auth_key[0].value}",
+      "vm-series-auto-registration-pin-id=${data.aws_ssm_parameter.palo_alto_pin_id[0].value}",
+      "vm-series-auto-registration-pin-value=${data.aws_ssm_parameter.palo_alto_pin_value[0].value}",
+      "authcodes=${data.aws_ssm_parameter.palo_alto_authcode[0].value}",
+      var.panorama_config.cgname != null ? "cgname=${var.panorama_config.cgname}" : "",
+      var.panorama_config.plugin_op_commands != null ? "plugin-op-commands=${var.panorama_config.plugin_op_commands}" : ""
+    ])) : join(";", [
       "type=dhcp-client",
       "storage-account=${module.bootstrap[each.key].storage_account_name}",
       "access-key=${module.bootstrap[each.key].storage_account_primary_access_key}",

@@ -105,3 +105,39 @@ data "azurerm_virtual_network" "existing_vnet" {
   name                = each.key
   resource_group_name = each.value.resource_group_name
 }
+
+# Panorama SSM Parameters - Only retrieved when panorama_config is set
+data "aws_ssm_parameter" "panorama_public_ip" {
+  count           = var.panorama_config != null ? 1 : 0
+  name            = "/panorama/public_ip"
+  with_decryption = true
+  provider        = aws.ssm
+}
+
+data "aws_ssm_parameter" "vm_auth_key" {
+  count           = var.panorama_config != null ? 1 : 0
+  name            = "/panorama/vm_auth_key"
+  with_decryption = true
+  provider        = aws.ssm
+}
+
+data "aws_ssm_parameter" "palo_alto_pin_id" {
+  count           = var.panorama_config != null ? 1 : 0
+  name            = "/paloalto/pin_id"
+  with_decryption = true
+  provider        = aws.ssm
+}
+
+data "aws_ssm_parameter" "palo_alto_pin_value" {
+  count           = var.panorama_config != null ? 1 : 0
+  name            = "/paloalto/pin_value"
+  with_decryption = true
+  provider        = aws.ssm
+}
+
+data "aws_ssm_parameter" "palo_alto_authcode" {
+  count           = var.panorama_config != null ? 1 : 0
+  name            = "/paloalto/authcode"
+  with_decryption = true
+  provider        = aws.ssm
+}
