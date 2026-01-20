@@ -80,9 +80,9 @@ variable "transits" {
     admin_password         = optional(string, "Avtx1234#")
     bootstrap_type         = optional(string, "file_share") # "file_share" or "panorama"
     # Per-transit Panorama overrides (uses global panorama_config if not set)
-    panorama_dgname        = optional(string) # Override device group for this transit
-    panorama_tplname       = optional(string) # Override template stack for this transit
-    panorama_cgname        = optional(string) # Override collector group for this transit
+    panorama_dgname  = optional(string) # Override device group for this transit
+    panorama_tplname = optional(string) # Override template stack for this transit
+    panorama_cgname  = optional(string) # Override collector group for this transit
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
@@ -124,10 +124,10 @@ variable "spokes" {
     instance_size                    = string
     enable_bgp                       = optional(bool, false)
     local_as_number                  = optional(number)
-    included_advertised_spoke_routes = optional(string)        # CIDRs to advertise to transit (comma-separated)
-    spoke_bgp_manual_advertise_cidrs = optional(list(string))  # CIDRs to advertise to BGP peers
-    enable_max_performance           = optional(bool, true)    # Enable maximum performance for spoke gateway
-    disable_route_propagation        = optional(bool, false)   # Disable route propagation on spoke subnets
+    included_advertised_spoke_routes = optional(string)       # CIDRs to advertise to transit (comma-separated)
+    spoke_bgp_manual_advertise_cidrs = optional(list(string)) # CIDRs to advertise to BGP peers
+    enable_max_performance           = optional(bool, true)   # Enable maximum performance for spoke gateway
+    disable_route_propagation        = optional(bool, false)  # Disable route propagation on spoke subnets
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string
@@ -142,7 +142,7 @@ variable "vwan_hubs" {
     virtual_hub_cidr                       = string
     virtual_router_auto_scale_min_capacity = optional(number, 2)
     azure_asn                              = optional(number, 65515)
-    propagate_default_route                = optional(bool, true)  # Propagate 0.0.0.0/0 to connected VNets
+    propagate_default_route                = optional(bool, true) # Propagate 0.0.0.0/0 to connected VNets
   }))
   default = {}
 }
@@ -155,15 +155,15 @@ variable "panorama_config" {
     tplname            = string
     dgname             = string
     vm_auth_key        = string
-    auth_key_ttl       = optional(string, "8760")      # Default to 1 year in hours
-    cgname             = optional(string)               # Collector group name
-    plugin_op_commands = optional(string)               # Plugin operational commands
+    auth_key_ttl       = optional(string, "8760") # Default to 1 year in hours
+    cgname             = optional(string)         # Collector group name
+    plugin_op_commands = optional(string)         # Plugin operational commands
     # Azure-specific options
-    enable_dpdk        = optional(bool, true)           # Enable DPDK for accelerated networking
-    mgmt_interface_swap = optional(bool, true)          # Swap management interface (required for Azure)
+    enable_dpdk         = optional(bool, true) # Enable DPDK for accelerated networking
+    mgmt_interface_swap = optional(bool, true) # Swap management interface (required for Azure)
     # CSP plugin options for Azure metadata integration
-    csp_pinid          = optional(string)               # CSP PIN ID (for PAYG licensing)
-    csp_pinvalue       = optional(string)               # CSP PIN value
+    csp_pinid    = optional(string) # CSP PIN ID (for PAYG licensing)
+    csp_pinvalue = optional(string) # CSP PIN value
   })
   default = null
 

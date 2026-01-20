@@ -221,9 +221,9 @@ locals {
         admin_username         = transit.admin_username
         admin_password         = transit.admin_password
         # Per-transit Panorama overrides
-        panorama_dgname        = transit.panorama_dgname
-        panorama_tplname       = transit.panorama_tplname
-        panorama_cgname        = transit.panorama_cgname
+        panorama_dgname  = transit.panorama_dgname
+        panorama_tplname = transit.panorama_tplname
+        panorama_cgname  = transit.panorama_cgname
       }],
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         transit_key            = transit_key
@@ -245,9 +245,9 @@ locals {
         admin_username         = transit.admin_username
         admin_password         = transit.admin_password
         # Per-transit Panorama overrides
-        panorama_dgname        = transit.panorama_dgname
-        panorama_tplname       = transit.panorama_tplname
-        panorama_cgname        = transit.panorama_cgname
+        panorama_dgname  = transit.panorama_dgname
+        panorama_tplname = transit.panorama_tplname
+        panorama_cgname  = transit.panorama_cgname
       }]
     )
   ])
@@ -429,26 +429,26 @@ module "mc-transit" {
   source   = "terraform-aviatrix-modules/mc-transit/aviatrix"
   version  = "8.0.0"
 
-  account                       = each.value.account
-  az_support                    = false
-  cloud                         = "azure"
-  cidr                          = each.value.cidr
-  region                        = var.region
-  instance_size                 = each.value.instance_size
-  name                          = each.key
-  gw_name                       = local.stripped_names[each.key]
-  local_as_number               = each.value.local_as_number
-  enable_transit_firenet        = true
-  enable_bgp_over_lan           = true
-  bgp_ecmp                      = true
-  enable_segmentation           = true
-  enable_advertise_transit_cidr       = true
-  enable_multi_tier_transit            = true
-  insane_mode                          = true
-  bgp_manual_spoke_advertise_cidrs     = each.value.bgp_manual_spoke_advertise_cidrs
-  resource_group                       = azurerm_resource_group.transit_rg[each.key].name
-  bgp_lan_interfaces_count      = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
-  tags                          = var.tags
+  account                          = each.value.account
+  az_support                       = false
+  cloud                            = "azure"
+  cidr                             = each.value.cidr
+  region                           = var.region
+  instance_size                    = each.value.instance_size
+  name                             = each.key
+  gw_name                          = local.stripped_names[each.key]
+  local_as_number                  = each.value.local_as_number
+  enable_transit_firenet           = true
+  enable_bgp_over_lan              = true
+  bgp_ecmp                         = true
+  enable_segmentation              = true
+  enable_advertise_transit_cidr    = true
+  enable_multi_tier_transit        = true
+  insane_mode                      = true
+  bgp_manual_spoke_advertise_cidrs = each.value.bgp_manual_spoke_advertise_cidrs
+  resource_group                   = azurerm_resource_group.transit_rg[each.key].name
+  bgp_lan_interfaces_count         = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
+  tags                             = var.tags
 }
 
 resource "aviatrix_firenet" "firenet" {
@@ -681,7 +681,7 @@ module "pan_fw" {
       var.panorama_config.enable_dpdk ? "op-cmd-dpdk-pkt-io=on" : "",
       # Plugin operational commands
       var.panorama_config.plugin_op_commands != null ? "plugin-op-commands=${var.panorama_config.plugin_op_commands}" : ""
-    ])) : join(";", [
+      ])) : join(";", [
       "type=dhcp-client",
       "storage-account=${module.bootstrap[each.key].storage_account_name}",
       "access-key=${module.bootstrap[each.key].storage_account_primary_access_key}",
@@ -803,30 +803,30 @@ resource "aviatrix_firewall_instance_association" "fw_associations" {
 }
 
 module "mc-spoke" {
-  for_each                          = var.spokes
-  source                            = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version                           = "8.0.0"
-  account                           = each.value.account
-  az_support                        = false
-  cloud                             = "azure"
-  cidr                              = each.value.cidr
-  region                            = var.region
-  instance_size                     = each.value.instance_size
-  name                              = each.key
-  gw_name                           = local.stripped_spoke_names[each.key]
-  local_as_number                   = try(each.value.enable_bgp, false) ? each.value.local_as_number : null
-  bgp_ecmp                          = try(each.value.enable_bgp, false) ? true : null
-  insane_mode                       = true
-  resource_group                    = azurerm_resource_group.vnet_rg[each.key].name
-  transit_gw                        = local.spoke_transit_gw[each.key]
-  enable_bgp                        = try(each.value.enable_bgp, false)
-  enable_bgp_over_lan               = try(each.value.enable_bgp, false) ? true : null
-  bgp_lan_interfaces_count          = try(each.value.enable_bgp, false) ? 1 : null
-  included_advertised_spoke_routes  = each.value.included_advertised_spoke_routes
-  enable_max_performance            = each.value.enable_max_performance
-  disable_route_propagation         = each.value.disable_route_propagation
-  inspection                        = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
-  tags                              = var.tags
+  for_each                         = var.spokes
+  source                           = "terraform-aviatrix-modules/mc-spoke/aviatrix"
+  version                          = "8.0.0"
+  account                          = each.value.account
+  az_support                       = false
+  cloud                            = "azure"
+  cidr                             = each.value.cidr
+  region                           = var.region
+  instance_size                    = each.value.instance_size
+  name                             = each.key
+  gw_name                          = local.stripped_spoke_names[each.key]
+  local_as_number                  = try(each.value.enable_bgp, false) ? each.value.local_as_number : null
+  bgp_ecmp                         = try(each.value.enable_bgp, false) ? true : null
+  insane_mode                      = true
+  resource_group                   = azurerm_resource_group.vnet_rg[each.key].name
+  transit_gw                       = local.spoke_transit_gw[each.key]
+  enable_bgp                       = try(each.value.enable_bgp, false)
+  enable_bgp_over_lan              = try(each.value.enable_bgp, false) ? true : null
+  bgp_lan_interfaces_count         = try(each.value.enable_bgp, false) ? 1 : null
+  included_advertised_spoke_routes = each.value.included_advertised_spoke_routes
+  enable_max_performance           = each.value.enable_max_performance
+  disable_route_propagation        = each.value.disable_route_propagation
+  inspection                       = (contains(keys(local.spoke_to_firenet_transit), each.key) && try(var.transits[local.spoke_to_firenet_transit[each.key]].inspection_enabled, false)) ? true : false
+  tags                             = var.tags
 
   depends_on = [azurerm_resource_group.vnet_rg, module.mc-transit]
 
@@ -889,25 +889,25 @@ resource "aviatrix_spoke_external_device_conn" "spoke_external" {
     if try(var.spokes[pair.spoke_key].enable_bgp, false)
   }
 
-  vpc_id                    = each.value.type == "transit" ? module.mc-transit[each.value.key].vpc.vpc_id : module.mc-spoke[each.value.key].vpc.vpc_id
-  connection_name           = "external-${each.value.vwan_hub_name}-${each.value.key}"
-  gw_name                   = each.value.type == "transit" ? module.mc-transit[each.value.key].transit_gateway.gw_name : module.mc-spoke[each.value.key].spoke_gateway.gw_name
-  connection_type           = "bgp"
-  tunnel_protocol           = "LAN"
-  remote_vpc_name           = format("%s:%s:%s", local.hub_managed_vnets[each.value.vwan_hub_name].vnet_name, local.hub_managed_vnets[each.value.vwan_hub_name].resource_group, local.hub_managed_vnets[each.value.vwan_hub_name].subscription_id)
-  ha_enabled                = true
-  bgp_local_as_num          = each.value.local_as_number
-  bgp_remote_as_num         = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
-  backup_bgp_remote_as_num  = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
-  remote_lan_ip             = local.vwan_connect_ip[each.key].hub_ip_primary
-  backup_remote_lan_ip      = local.vwan_connect_ip[each.key].hub_ip_ha
-  local_lan_ip              = each.value.bgp_lan_ips.primary
-  backup_local_lan_ip       = each.value.bgp_lan_ips.ha
-  enable_bgp_lan_activemesh = true
+  vpc_id                      = each.value.type == "transit" ? module.mc-transit[each.value.key].vpc.vpc_id : module.mc-spoke[each.value.key].vpc.vpc_id
+  connection_name             = "external-${each.value.vwan_hub_name}-${each.value.key}"
+  gw_name                     = each.value.type == "transit" ? module.mc-transit[each.value.key].transit_gateway.gw_name : module.mc-spoke[each.value.key].spoke_gateway.gw_name
+  connection_type             = "bgp"
+  tunnel_protocol             = "LAN"
+  remote_vpc_name             = format("%s:%s:%s", local.hub_managed_vnets[each.value.vwan_hub_name].vnet_name, local.hub_managed_vnets[each.value.vwan_hub_name].resource_group, local.hub_managed_vnets[each.value.vwan_hub_name].subscription_id)
+  ha_enabled                  = true
+  bgp_local_as_num            = each.value.local_as_number
+  bgp_remote_as_num           = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
+  backup_bgp_remote_as_num    = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
+  remote_lan_ip               = local.vwan_connect_ip[each.key].hub_ip_primary
+  backup_remote_lan_ip        = local.vwan_connect_ip[each.key].hub_ip_ha
+  local_lan_ip                = each.value.bgp_lan_ips.primary
+  backup_local_lan_ip         = each.value.bgp_lan_ips.ha
+  enable_bgp_lan_activemesh   = true
   manual_bgp_advertised_cidrs = try(var.spokes[each.value.spoke_key].spoke_bgp_manual_advertise_cidrs, null)
-  direct_connect            = false
-  custom_algorithms         = false
-  phase1_local_identifier   = null
+  direct_connect              = false
+  custom_algorithms           = false
+  phase1_local_identifier     = null
   depends_on = [
     time_sleep.wait_for_spoke_hub_connection,
     data.azurerm_virtual_network.transit_vnet,
