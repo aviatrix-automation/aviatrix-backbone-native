@@ -773,6 +773,7 @@ resource "aviatrix_firewall_instance_association" "fw_associations" {
   for_each = {
     for fw in local.fws :
     "${local.stripped_names[fw.transit_key]}-${fw.type}-fw${fw.index + 1}" => fw
+    if var.transits[fw.transit_key].attach_firewall
   }
 
 

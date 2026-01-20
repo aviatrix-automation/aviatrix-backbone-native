@@ -28,6 +28,7 @@ variable "transits" {
     fw_instance_size            = optional(string, "c5.xlarge")
     firewall_image              = optional(string, "")
     firewall_image_version      = optional(string, "")
+    attach_firewall             = optional(bool, true)
     bootstrap_bucket_name_1     = optional(string, "")
     tgw_name                    = optional(string, "")
     inspection_enabled          = optional(bool, false)

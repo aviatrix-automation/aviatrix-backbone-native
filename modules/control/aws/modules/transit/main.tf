@@ -409,7 +409,7 @@ module "pan_fw" {
 }
 
 resource "aviatrix_firewall_instance_association" "fw_associations" {
-  for_each = { for fw in local.fws : "${module.mc-transit[fw.transit_key].transit_gateway.gw_name}-${fw.type}-fw${fw.index + 1}" => fw }
+  for_each = { for fw in local.fws : "${module.mc-transit[fw.transit_key].transit_gateway.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if var.transits[fw.transit_key].attach_firewall }
 
   vpc_id               = module.mc-transit[each.value.transit_key].vpc.vpc_id
   firenet_gw_name      = each.value.type == "pri" ? module.mc-transit[each.value.transit_key].transit_gateway.gw_name : module.mc-transit[each.value.transit_key].transit_gateway.ha_gw_name

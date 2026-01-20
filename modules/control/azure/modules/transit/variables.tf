@@ -69,6 +69,7 @@ variable "transits" {
     fw_amount              = optional(number, 0)
     fw_instance_size       = optional(string)
     firewall_image_version = optional(string)
+    attach_firewall        = optional(bool, true)
     inspection_enabled     = optional(bool, false)
     egress_enabled         = optional(bool, true)
     ssh_keys               = optional(list(string), [])

@@ -29,6 +29,7 @@ variable "transits" {
     fw_instance_size            = optional(string, "n2-standard-4")
     firewall_image              = optional(string, "")
     firewall_image_version      = optional(string, "")
+    attach_firewall             = optional(bool, true)
     lan_cidr                    = optional(string, "")
     mgmt_cidr                   = optional(string, "")
     egress_cidr                 = optional(string, "")
