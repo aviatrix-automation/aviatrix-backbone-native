@@ -47,9 +47,6 @@ module "transit" {
       account         = "lab-test-azure"
       enable_bgp      = true
       local_as_number = 65020
-      #included_advertised_spoke_routes = "10.4.0.0/16"
-      #spoke_bgp_manual_advertise_cidrs = ["0.0.0.0/0"]
-      disable_route_propagation = true
       vwan_connections = [
         {
           vwan_name     = "vwan-prod"
@@ -63,9 +60,6 @@ module "transit" {
       account         = "lab-test-azure"
       enable_bgp      = true
       local_as_number = 65022
-      #included_advertised_spoke_routes = "10.6.0.0/16"
-      #spoke_bgp_manual_advertise_cidrs = ["0.0.0.0/0"]
-      disable_route_propagation = true
       vwan_connections = [
         {
           vwan_name     = "vwan-non-prod"

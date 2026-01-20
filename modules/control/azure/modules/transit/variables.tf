@@ -10,6 +10,18 @@ variable "region" {
   type        = string
 }
 
+variable "dns_primary" {
+  description = "Primary DNS server for firewall bootstrap."
+  type        = string
+  default     = "168.63.129.16" # Azure DNS
+}
+
+variable "dns_secondary" {
+  description = "Secondary DNS server for firewall bootstrap."
+  type        = string
+  default     = "8.8.8.8"
+}
+
 
 variable "subscription_id" {
   description = "Azure subscription ID."
@@ -66,6 +78,11 @@ variable "transits" {
     enable_password_auth   = optional(bool, false)
     admin_username         = optional(string, "panadmin")
     admin_password         = optional(string, "Avtx1234#")
+    bootstrap_type         = optional(string, "file_share") # "file_share" or "panorama"
+    # Per-transit Panorama overrides (uses global panorama_config if not set)
+    panorama_dgname  = optional(string) # Override device group for this transit
+    panorama_tplname = optional(string) # Override template stack for this transit
+    panorama_cgname  = optional(string) # Override collector group for this transit
     file_shares = optional(map(object({
       name                   = string
       bootstrap_package_path = optional(string)
@@ -81,6 +98,22 @@ variable "transits" {
     })))
   }))
   default = {}
+
+  validation {
+    condition = alltrue([
+      for k, v in var.transits :
+      v.bootstrap_type == "file_share" || v.bootstrap_type == "panorama"
+    ])
+    error_message = "bootstrap_type must be either 'file_share' or 'panorama'."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.transits :
+      v.bootstrap_type != "file_share" || v.file_shares != null
+    ])
+    error_message = "file_shares must be provided when bootstrap_type is 'file_share'."
+  }
 }
 
 variable "spokes" {
@@ -91,10 +124,10 @@ variable "spokes" {
     instance_size                    = string
     enable_bgp                       = optional(bool, false)
     local_as_number                  = optional(number)
-    included_advertised_spoke_routes = optional(string)        # CIDRs to advertise to transit (comma-separated)
-    spoke_bgp_manual_advertise_cidrs = optional(list(string))  # CIDRs to advertise to BGP peers
-    enable_max_performance           = optional(bool, true)    # Enable maximum performance for spoke gateway
-    disable_route_propagation        = optional(bool, false)   # Disable route propagation on spoke subnets
+    included_advertised_spoke_routes = optional(string)       # CIDRs to advertise to transit (comma-separated)
+    spoke_bgp_manual_advertise_cidrs = optional(list(string)) # CIDRs to advertise to BGP peers
+    enable_max_performance           = optional(bool, true)   # Enable maximum performance for spoke gateway
+    disable_route_propagation        = optional(bool, false)  # Disable route propagation on spoke subnets
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string
@@ -109,9 +142,35 @@ variable "vwan_hubs" {
     virtual_hub_cidr                       = string
     virtual_router_auto_scale_min_capacity = optional(number, 2)
     azure_asn                              = optional(number, 65515)
-    propagate_default_route                = optional(bool, true)  # Propagate 0.0.0.0/0 to connected VNets
+    propagate_default_route                = optional(bool, true) # Propagate 0.0.0.0/0 to connected VNets
   }))
   default = {}
+}
+
+variable "panorama_config" {
+  description = "Panorama configuration for dynamic bootstrap. When used, firewalls will register with Panorama for configuration management."
+  type = object({
+    panorama_server    = string
+    panorama_server2   = optional(string)
+    tplname            = string
+    dgname             = string
+    vm_auth_key        = string
+    auth_key_ttl       = optional(string, "8760") # Default to 1 year in hours
+    cgname             = optional(string)         # Collector group name
+    plugin_op_commands = optional(string)         # Plugin operational commands
+    # Azure-specific options
+    enable_dpdk         = optional(bool, true) # Enable DPDK for accelerated networking
+    mgmt_interface_swap = optional(bool, true) # Swap management interface (required for Azure)
+    # CSP plugin options for Azure metadata integration
+    csp_pinid    = optional(string) # CSP PIN ID (for PAYG licensing)
+    csp_pinvalue = optional(string) # CSP PIN value
+  })
+  default = null
+
+  validation {
+    condition     = var.panorama_config == null || (var.panorama_config.tplname != "" && var.panorama_config.dgname != "")
+    error_message = "panorama_config.tplname and panorama_config.dgname must not be empty when panorama_config is provided."
+  }
 }
 
 variable "tags" {
