@@ -6,7 +6,7 @@ module "transit" {
 
   tags = {
     Environment = "Production"
-    Customer    = "Rubrik"
+    Customer    = "customer"
     CostCenter  = "IT-123"
     ManagedBy   = "Terraform"
   }
