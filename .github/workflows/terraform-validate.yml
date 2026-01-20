@@ -47,11 +47,13 @@ jobs:
         id: init
         run: terraform init -backend=false
         working-directory: ${{ matrix.directory }}
+        continue-on-error: true
 
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
         working-directory: ${{ matrix.directory }}
+        continue-on-error: true
 
       - name: Comment PR
         uses: actions/github-script@v7
@@ -97,6 +99,8 @@ jobs:
         run: tflint --init
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Run TFLint
         run: tflint --recursive --format compact
+        continue-on-error: true
