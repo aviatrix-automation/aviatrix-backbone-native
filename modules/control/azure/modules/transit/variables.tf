@@ -168,7 +168,10 @@ variable "panorama_config" {
   default = null
 
   validation {
-    condition     = var.panorama_config == null || (var.panorama_config.tplname != "" && var.panorama_config.dgname != "")
+    condition = (
+      var.panorama_config == null ||
+      (try(var.panorama_config.tplname, "") != "" && try(var.panorama_config.dgname, "") != "")
+    )
     error_message = "panorama_config.tplname and panorama_config.dgname must not be empty when panorama_config is provided."
   }
 }
