@@ -73,11 +73,11 @@ resource "aviatrix_transit_gateway_peering" "same_cloud" {
 
   transit_gateway_name1                       = each.value.gateway_1
   transit_gateway_name2                       = each.value.gateway_2
-  enable_peering_over_private_network         = var.enable_peering_over_private_network
-  enable_insane_mode_encryption_over_internet = var.enable_insane_mode_encryption_over_internet != null ? var.enable_insane_mode_encryption_over_internet : each.value.hpe_supported
-  enable_max_performance                      = var.enable_max_performance
-  enable_single_tunnel_mode                   = var.enable_single_tunnel_mode
-  tunnel_count                                = var.tunnel_count != null ? var.tunnel_count : (each.value.hpe_supported ? 15 : null)
+  enable_peering_over_private_network         = var.same_cloud_enable_peering_over_private_network
+  enable_insane_mode_encryption_over_internet = var.same_cloud_enable_insane_mode_encryption_over_internet != null ? var.same_cloud_enable_insane_mode_encryption_over_internet : each.value.hpe_supported
+  enable_max_performance                      = var.same_cloud_enable_max_performance
+  enable_single_tunnel_mode                   = var.same_cloud_enable_single_tunnel_mode
+  tunnel_count                                = var.same_cloud_tunnel_count != null ? var.same_cloud_tunnel_count : (each.value.hpe_supported ? 15 : null)
 }
 
 # Cross-cloud peering
@@ -86,9 +86,9 @@ resource "aviatrix_transit_gateway_peering" "cross_cloud" {
 
   transit_gateway_name1                       = each.value.gateway_1
   transit_gateway_name2                       = each.value.gateway_2
-  enable_peering_over_private_network         = var.enable_peering_over_private_network
-  enable_insane_mode_encryption_over_internet = var.enable_insane_mode_encryption_over_internet != null ? var.enable_insane_mode_encryption_over_internet : each.value.hpe_supported
-  enable_max_performance                      = var.enable_max_performance
-  enable_single_tunnel_mode                   = var.enable_single_tunnel_mode
-  tunnel_count                                = var.tunnel_count != null ? var.tunnel_count : (each.value.hpe_supported ? 15 : null)
+  enable_peering_over_private_network         = var.cross_cloud_enable_peering_over_private_network
+  enable_insane_mode_encryption_over_internet = var.cross_cloud_enable_insane_mode_encryption_over_internet != null ? var.cross_cloud_enable_insane_mode_encryption_over_internet : each.value.hpe_supported
+  enable_max_performance                      = var.cross_cloud_enable_max_performance
+  enable_single_tunnel_mode                   = var.cross_cloud_enable_single_tunnel_mode
+  tunnel_count                                = var.cross_cloud_tunnel_count != null ? var.cross_cloud_tunnel_count : (each.value.hpe_supported ? 15 : null)
 }
