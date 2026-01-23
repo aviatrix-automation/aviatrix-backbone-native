@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.2.0...v0.3.0) (2026-01-23)
+
+
+### Features
+
+* add learned CIDRs approval support to AWS, Azure, and GCP transits modules ([#10](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/10)) ([a6f30ee](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/a6f30eec453bd1f7d3de20a3d814309d9ed8e4da))
+
 ## [0.2.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.1.0...v0.2.0) (2026-01-22)
 
 
