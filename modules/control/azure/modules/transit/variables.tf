@@ -93,6 +93,10 @@ variable "transits" {
       access_tier            = optional(string)
     })))
     bgp_manual_spoke_advertise_cidrs = optional(string)
+    # Learned CIDRs approval configuration
+    enable_learned_cidrs_approval = optional(bool, false)
+    learned_cidrs_approval_mode   = optional(string, "gateway")
+    approved_learned_cidrs        = optional(set(string), [])
     vwan_connections = optional(list(object({
       vwan_name     = string
       vwan_hub_name = string
