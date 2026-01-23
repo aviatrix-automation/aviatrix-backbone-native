@@ -26,9 +26,9 @@ locals {
   all_primary_gateway_names = flatten(values(local.primary_gateways_by_cloud_type))
 
   # Cloud types: 1=AWS, 4=GCP, 8=Azure
-  # HPE/Insane mode over internet only supported between AWS (1) and Azure (8)
+  # HPE/Insane mode over internet supported among AWS, GCP, and Azure
   # Max performance supported for same-cloud: AWS (1), GCP (4), Azure (8)
-  hpe_over_internet_cloud_types = [1, 8]  # AWS and Azure only
+  hpe_over_internet_cloud_types = [1, 4, 8]  # AWS, GCP, and Azure
   max_performance_cloud_types   = [1, 4, 8]  # AWS, GCP, and Azure
 
   # Generate same-cloud peering pairs (full mesh within each cloud type)
@@ -57,7 +57,7 @@ locals {
         gateway_2    = gw2
         cloud_type_1 = local.gw_name_to_cloud_type[gw1]
         cloud_type_2 = local.gw_name_to_cloud_type[gw2]
-        # HPE over internet only supported if BOTH gateways are AWS or Azure
+        # HPE over internet supported if BOTH gateways are AWS, GCP, or Azure
         hpe_over_internet_supported = (
           contains(local.hpe_over_internet_cloud_types, local.gw_name_to_cloud_type[gw1]) &&
           contains(local.hpe_over_internet_cloud_types, local.gw_name_to_cloud_type[gw2])

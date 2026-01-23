@@ -31,7 +31,7 @@ variable "cross_cloud_enable_peering_over_private_network" {
 }
 
 variable "cross_cloud_enable_insane_mode_encryption_over_internet" {
-  description = "Enable Insane Mode Encryption over Internet for cross-cloud peering. Transit gateways must be in Insane Mode. Only supported between AWS and Azure (not GCP)."
+  description = "Enable Insane Mode Encryption over Internet for cross-cloud peering. Transit gateways must be in Insane Mode. Supported among AWS, GCP, and Azure."
   type        = bool
   default     = null
 }
@@ -43,7 +43,7 @@ variable "cross_cloud_enable_single_tunnel_mode" {
 }
 
 variable "cross_cloud_tunnel_count" {
-  description = "Number of public tunnels for cross-cloud Insane Mode Encryption over Internet. Valid range: 2-20. Only for AWS-Azure peerings."
+  description = "Number of public tunnels for cross-cloud Insane Mode Encryption over Internet. Valid range: 2-20. Supported for cross-cloud peerings with HPE."
   type        = number
   default     = null
 }
