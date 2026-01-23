@@ -27,18 +27,20 @@ locals {
 
   # Cloud types: 1=AWS, 4=GCP, 8=Azure
   # HPE/Insane mode over internet only supported between AWS (1) and Azure (8)
-  hpe_supported_cloud_types = [1, 8]
+  # Max performance supported for same-cloud: AWS (1), GCP (4), Azure (8)
+  hpe_over_internet_cloud_types = [1, 8]  # AWS and Azure only
+  max_performance_cloud_types   = [1, 4, 8]  # AWS, GCP, and Azure
 
   # Generate same-cloud peering pairs (full mesh within each cloud type)
   same_cloud_peering_pairs = flatten([
     for cloud_type, gateways in local.same_cloud_peering : [
       for i, gw1 in gateways : [
         for j, gw2 in gateways : {
-          key           = "${gw1}:${gw2}"
-          gateway_1     = gw1
-          gateway_2     = gw2
-          cloud_type    = cloud_type
-          hpe_supported = contains(local.hpe_supported_cloud_types, cloud_type)
+          key                   = "${gw1}:${gw2}"
+          gateway_1             = gw1
+          gateway_2             = gw2
+          cloud_type            = cloud_type
+          max_performance_supported = contains(local.max_performance_cloud_types, cloud_type)
         } if i < j
       ]
     ]
@@ -55,10 +57,10 @@ locals {
         gateway_2    = gw2
         cloud_type_1 = local.gw_name_to_cloud_type[gw1]
         cloud_type_2 = local.gw_name_to_cloud_type[gw2]
-        # HPE only supported if BOTH gateways are AWS or Azure
-        hpe_supported = (
-          contains(local.hpe_supported_cloud_types, local.gw_name_to_cloud_type[gw1]) &&
-          contains(local.hpe_supported_cloud_types, local.gw_name_to_cloud_type[gw2])
+        # HPE over internet only supported if BOTH gateways are AWS or Azure
+        hpe_over_internet_supported = (
+          contains(local.hpe_over_internet_cloud_types, local.gw_name_to_cloud_type[gw1]) &&
+          contains(local.hpe_over_internet_cloud_types, local.gw_name_to_cloud_type[gw2])
         )
       } if i < j && local.gw_name_to_cloud_type[gw1] != local.gw_name_to_cloud_type[gw2]
     ]
@@ -71,13 +73,13 @@ locals {
 resource "aviatrix_transit_gateway_peering" "same_cloud" {
   for_each = local.same_cloud_peering_map
 
-  transit_gateway_name1                       = each.value.gateway_1
-  transit_gateway_name2                       = each.value.gateway_2
-  enable_peering_over_private_network         = var.same_cloud_enable_peering_over_private_network
-  enable_insane_mode_encryption_over_internet = var.same_cloud_enable_insane_mode_encryption_over_internet != null ? var.same_cloud_enable_insane_mode_encryption_over_internet : each.value.hpe_supported
-  enable_max_performance                      = var.same_cloud_enable_max_performance
-  enable_single_tunnel_mode                   = var.same_cloud_enable_single_tunnel_mode
-  tunnel_count                                = var.same_cloud_tunnel_count != null ? var.same_cloud_tunnel_count : (each.value.hpe_supported ? 15 : null)
+  transit_gateway_name1               = each.value.gateway_1
+  transit_gateway_name2               = each.value.gateway_2
+  enable_peering_over_private_network = var.same_cloud_enable_peering_over_private_network
+  enable_max_performance              = var.same_cloud_enable_max_performance
+  enable_single_tunnel_mode           = var.same_cloud_enable_single_tunnel_mode
+  # Note: enable_insane_mode_encryption_over_internet should NOT be used for same-cloud peering
+  # Note: tunnel_count should NOT be used for same-cloud peering (only for cross-cloud)
 }
 
 # Cross-cloud peering
@@ -87,8 +89,8 @@ resource "aviatrix_transit_gateway_peering" "cross_cloud" {
   transit_gateway_name1                       = each.value.gateway_1
   transit_gateway_name2                       = each.value.gateway_2
   enable_peering_over_private_network         = var.cross_cloud_enable_peering_over_private_network
-  enable_insane_mode_encryption_over_internet = var.cross_cloud_enable_insane_mode_encryption_over_internet != null ? var.cross_cloud_enable_insane_mode_encryption_over_internet : each.value.hpe_supported
-  enable_max_performance                      = var.cross_cloud_enable_max_performance
+  enable_insane_mode_encryption_over_internet = var.cross_cloud_enable_insane_mode_encryption_over_internet != null ? var.cross_cloud_enable_insane_mode_encryption_over_internet : each.value.hpe_over_internet_supported
   enable_single_tunnel_mode                   = var.cross_cloud_enable_single_tunnel_mode
-  tunnel_count                                = var.cross_cloud_tunnel_count != null ? var.cross_cloud_tunnel_count : (each.value.hpe_supported ? 15 : null)
+  tunnel_count                                = var.cross_cloud_tunnel_count != null ? var.cross_cloud_tunnel_count : (each.value.hpe_over_internet_supported ? 15 : null)
+  # Note: enable_max_performance should NOT be used for cross-cloud peering (only for same-cloud)
 }

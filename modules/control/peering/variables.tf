@@ -11,14 +11,8 @@ variable "same_cloud_enable_peering_over_private_network" {
   default     = false
 }
 
-variable "same_cloud_enable_insane_mode_encryption_over_internet" {
-  description = "Enable Insane Mode Encryption over Internet for same-cloud peering. Transit gateways must be in Insane Mode. Only supported between AWS and Azure."
-  type        = bool
-  default     = null
-}
-
 variable "same_cloud_enable_max_performance" {
-  description = "Enable maximum amount of HPE tunnels for same-cloud peering. Only valid when transit gateways are in Insane Mode and same cloud type."
+  description = "Enable maximum amount of HPE tunnels for same-cloud peering. Only valid when transit gateways are in Insane Mode and same cloud type. Supported for AWS, GCP, and Azure."
   type        = bool
   default     = true
 }
@@ -29,12 +23,6 @@ variable "same_cloud_enable_single_tunnel_mode" {
   default     = false
 }
 
-variable "same_cloud_tunnel_count" {
-  description = "Number of public tunnels for same-cloud Insane Mode Encryption over Internet. Valid range: 2-20. Only for AWS-Azure peerings."
-  type        = number
-  default     = null
-}
-
 # Cross-cloud peering configuration
 variable "cross_cloud_enable_peering_over_private_network" {
   description = "Enable peering over private network for cross-cloud peering. Only applies when two transit gateways are in Insane Mode and different cloud types."
@@ -43,15 +31,9 @@ variable "cross_cloud_enable_peering_over_private_network" {
 }
 
 variable "cross_cloud_enable_insane_mode_encryption_over_internet" {
-  description = "Enable Insane Mode Encryption over Internet for cross-cloud peering. Transit gateways must be in Insane Mode. Only supported between AWS and Azure."
+  description = "Enable Insane Mode Encryption over Internet for cross-cloud peering. Transit gateways must be in Insane Mode. Only supported between AWS and Azure (not GCP)."
   type        = bool
   default     = null
-}
-
-variable "cross_cloud_enable_max_performance" {
-  description = "Enable maximum amount of HPE tunnels for cross-cloud peering. Only valid when transit gateways are in Insane Mode."
-  type        = bool
-  default     = true
 }
 
 variable "cross_cloud_enable_single_tunnel_mode" {
