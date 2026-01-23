@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.1.0...v0.2.0) (2026-01-22)
+
+
+### Features
+
+* add configurable peering parameters and update provider version ([#6](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/6)) ([391b63f](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/391b63fec4d573a0b0f6897cfb0d183b4ca22c2d))
+
 ## 0.1.0 (2026-01-20)
 
 
