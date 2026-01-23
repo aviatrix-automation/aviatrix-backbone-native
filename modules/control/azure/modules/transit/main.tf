@@ -446,6 +446,10 @@ module "mc-transit" {
   enable_multi_tier_transit        = true
   insane_mode                      = true
   bgp_manual_spoke_advertise_cidrs = each.value.bgp_manual_spoke_advertise_cidrs
+  # Learned CIDRs approval configuration
+  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
+  learned_cidrs_approval_mode   = each.value.learned_cidrs_approval_mode
+  approved_learned_cidrs        = length(each.value.approved_learned_cidrs) > 0 ? each.value.approved_learned_cidrs : null
   resource_group                   = azurerm_resource_group.transit_rg[each.key].name
   bgp_lan_interfaces_count         = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
   tags                             = var.tags

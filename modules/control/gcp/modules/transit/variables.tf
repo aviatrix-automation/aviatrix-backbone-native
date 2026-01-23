@@ -43,6 +43,10 @@ variable "transits" {
     service_account             = optional(string, "")
     name_prefix                 = optional(string, "paloaltonetworks-firewall-bootstrap-")
     files                       = optional(map(string), {})
+    # Learned CIDRs approval configuration
+    enable_learned_cidrs_approval = optional(bool, false)
+    learned_cidrs_approval_mode   = optional(string, "gateway")
+    approved_learned_cidrs        = optional(set(string), [])
   }))
   validation {
     condition = alltrue([
