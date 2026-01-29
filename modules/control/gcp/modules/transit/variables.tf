@@ -127,7 +127,7 @@ variable "spokes" {
 }
 
 variable "aviatrix_spokes" {
-  description = "Map of Aviatrix spoke gateway configurations keyed by the spoke name."
+  description = "Map of Aviatrix spoke gateway configurations keyed by the spoke name. Note: BGP is NOT supported for GCP spoke gateways."
   type = map(object({
     account                          = string
     region                           = string
@@ -138,8 +138,6 @@ variable "aviatrix_spokes" {
     insane_mode                      = optional(bool, true)
     enable_max_performance           = optional(bool, false)
     spoke_instance_size              = optional(string, "n1-standard-1")
-    enable_bgp                       = optional(bool, false)
-    local_as_number                  = optional(string)
     allocate_new_eip                 = optional(bool, false)
     eip                              = optional(string)
     ha_eip                           = optional(string)

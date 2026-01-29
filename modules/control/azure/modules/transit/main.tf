@@ -189,12 +189,41 @@ locals {
     ]) > 0
   }
 
+  external_device_pairs = {
+    for k, v in var.external_devices : k => {
+      transit_key               = v.transit_key
+      connection_name           = v.connection_name
+      pair_key                  = "${v.transit_key}.${v.connection_name}"
+      remote_gateway_ip         = v.remote_gateway_ip
+      bgp_enabled               = v.bgp_enabled
+      bgp_remote_asn            = v.bgp_enabled ? v.bgp_remote_asn : null
+      backup_bgp_remote_as_num  = v.ha_enabled ? v.bgp_remote_asn : null
+      local_tunnel_cidr         = v.local_tunnel_cidr
+      remote_tunnel_cidr        = v.remote_tunnel_cidr
+      ha_enabled                = v.ha_enabled
+      backup_remote_gateway_ip  = v.ha_enabled ? v.backup_remote_gateway_ip : null
+      backup_local_tunnel_cidr  = v.ha_enabled ? v.backup_local_tunnel_cidr : null
+      backup_remote_tunnel_cidr = v.ha_enabled ? v.backup_remote_tunnel_cidr : null
+      enable_ikev2              = v.enable_ikev2
+      inspected_by_firenet      = v.inspected_by_firenet
+    }
+  }
+
+  external_inspection_policies = [
+    for k, v in local.external_device_pairs : {
+      transit_key     = v.transit_key
+      connection_name = v.connection_name
+      pair_key        = v.pair_key
+    } if v.inspected_by_firenet && lookup(var.transits[v.transit_key], "fw_amount", 0) > 0
+  ]
+
   inspection_policies = flatten([
     for transit_key in local.firenet_transit_keys : [
       for conn in(var.transits[transit_key].vwan_connections != null ? var.transits[transit_key].vwan_connections : []) : {
         transit_key     = transit_key
         vwan_hub_name   = conn.vwan_hub_name
         connection_name = "external-${conn.vwan_hub_name}-${transit_key}"
+        pair_key        = "${transit_key}.${conn.vwan_hub_name}"
       } if conn.vwan_hub_name != "" && contains(keys(var.vwan_hubs), conn.vwan_hub_name)
     ]
   ])
@@ -962,17 +991,52 @@ resource "azurerm_virtual_hub_bgp_connection" "spoke_peer_avx_ha" {
 }
 
 
+resource "aviatrix_transit_external_device_conn" "external_device" {
+  for_each                  = local.external_device_pairs
+  vpc_id                    = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name           = each.value.connection_name
+  gw_name                   = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip         = each.value.remote_gateway_ip
+  backup_remote_gateway_ip  = each.value.ha_enabled ? each.value.backup_remote_gateway_ip : null
+  backup_bgp_remote_as_num  = each.value.ha_enabled ? each.value.bgp_remote_asn : null
+  connection_type           = each.value.bgp_enabled ? "bgp" : "static"
+  bgp_local_as_num          = each.value.bgp_enabled ? module.mc-transit[each.value.transit_key].transit_gateway.local_as_number : null
+  bgp_remote_as_num         = each.value.bgp_enabled ? each.value.bgp_remote_asn : null
+  tunnel_protocol           = "IPsec"
+  direct_connect            = false
+  ha_enabled                = each.value.ha_enabled
+  local_tunnel_cidr         = each.value.local_tunnel_cidr
+  remote_tunnel_cidr        = each.value.remote_tunnel_cidr
+  backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
+  backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
+  enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
+  custom_algorithms         = false
+  phase1_local_identifier   = null
+
+  depends_on = [
+    module.mc-transit
+  ]
+}
+
 resource "aviatrix_transit_firenet_policy" "inspection_policies" {
   for_each = {
-    for policy in local.inspection_policies : "${policy.transit_key}.${policy.vwan_hub_name}" => policy
-    if try(var.transits[policy.transit_key].inspection_enabled, false)
+    for p in concat(local.inspection_policies, local.external_inspection_policies) :
+    p.pair_key => p
+    if lookup(
+      { for k, v in var.transits : k => v.inspection_enabled },
+      p.transit_key,
+      false
+    )
   }
 
   transit_firenet_gateway_name = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
   inspected_resource_name      = "SITE2CLOUD:${each.value.connection_name}"
 
   depends_on = [
-    aviatrix_transit_external_device_conn.transit_external
+    aviatrix_transit_external_device_conn.transit_external,
+    aviatrix_transit_external_device_conn.external_device,
+    aviatrix_firenet.firenet,
+    aviatrix_firewall_instance_association.fw_associations
   ]
 
 }
