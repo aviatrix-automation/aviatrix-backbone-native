@@ -876,16 +876,16 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
   backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
   enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
-  # Custom IPsec algorithm support
+  # Custom IPsec algorithm support - only set when custom_algorithms is true
   custom_algorithms         = each.value.custom_algorithms
-  pre_shared_key            = each.value.pre_shared_key
-  phase_1_authentication    = each.value.phase_1_authentication
-  phase_1_dh_groups         = each.value.phase_1_dh_groups
-  phase_1_encryption        = each.value.phase_1_encryption
-  phase_2_authentication    = each.value.phase_2_authentication
-  phase_2_dh_groups         = each.value.phase_2_dh_groups
-  phase_2_encryption        = each.value.phase_2_encryption
-  phase1_local_identifier   = each.value.phase1_local_identifier
+  pre_shared_key            = each.value.custom_algorithms ? each.value.pre_shared_key : null
+  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
+  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
+  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
+  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
+  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
+  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
+  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
 
   depends_on = [
     module.mc_transit
