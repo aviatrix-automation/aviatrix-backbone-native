@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.3.0...v0.4.0) (2026-01-29)
+
+
+### Features
+
+* add Aviatrix spoke gateway support to GCP transit module ([#12](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/12)) ([825cd1a](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/825cd1ae951340a5a04f5a7aa3eb7c448c7459af))
+
 ## [0.3.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.2.0...v0.3.0) (2026-01-23)
 
 
