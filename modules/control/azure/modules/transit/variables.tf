@@ -197,6 +197,16 @@ variable "external_devices" {
     backup_remote_tunnel_cidr = optional(string)
     enable_ikev2              = optional(bool)
     inspected_by_firenet      = bool
+    # Custom IPsec algorithm parameters
+    custom_algorithms         = optional(bool, false)
+    pre_shared_key            = optional(string)
+    phase_1_authentication    = optional(string)
+    phase_1_dh_groups         = optional(string)
+    phase_1_encryption        = optional(string)
+    phase_2_authentication    = optional(string)
+    phase_2_dh_groups         = optional(string)
+    phase_2_encryption        = optional(string)
+    phase1_local_identifier   = optional(string)
   }))
   default = {}
 }
