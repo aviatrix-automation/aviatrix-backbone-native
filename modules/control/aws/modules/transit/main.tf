@@ -192,10 +192,10 @@ module "mc-transit" {
   enable_advertise_transit_cidr = true
   enable_multi_tier_transit     = true
   # Learned CIDRs approval configuration
-  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
-  learned_cidrs_approval_mode   = each.value.learned_cidrs_approval_mode
-  approved_learned_cidrs        = length(each.value.approved_learned_cidrs) > 0 ? each.value.approved_learned_cidrs : null
-  tags                          = var.tags
+  learned_cidr_approval       = each.value.learned_cidr_approval
+  learned_cidrs_approval_mode = each.value.learned_cidrs_approval_mode
+  approved_learned_cidrs      = each.value.approved_learned_cidrs
+  tags                        = var.tags
 }
 
 resource "aviatrix_firenet" "firenet" {
