@@ -126,6 +126,30 @@ variable "spokes" {
   }
 }
 
+variable "aviatrix_spokes" {
+  description = "Map of Aviatrix spoke gateway configurations keyed by the spoke name."
+  type = map(object({
+    account                          = string
+    region                           = string
+    attached                         = bool
+    cidr                             = string
+    customized_spoke_vpc_routes      = optional(string, "")
+    included_advertised_spoke_routes = optional(string, "")
+    insane_mode                      = optional(bool, true)
+    enable_max_performance           = optional(bool, false)
+    spoke_instance_size              = optional(string, "n1-standard-1")
+    enable_bgp                       = optional(bool, false)
+    local_as_number                  = optional(string)
+    allocate_new_eip                 = optional(bool, false)
+    eip                              = optional(string)
+    ha_eip                           = optional(string)
+    single_ip_snat                   = optional(bool, false)
+    transit_gw_name                  = string
+  }))
+
+  default = {}
+}
+
 variable "ncc_hubs" {
   description = "List of NCC hubs to create"
   type = list(object({

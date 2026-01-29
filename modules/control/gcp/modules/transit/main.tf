@@ -836,3 +836,31 @@ resource "aviatrix_transit_firenet_policy" "inspection_policies" {
     aviatrix_transit_external_device_conn.bgp_lan_connections
   ]
 }
+
+module "mc-spoke" {
+  depends_on = [module.mc_transit]
+  for_each   = var.aviatrix_spokes
+  source     = "terraform-aviatrix-modules/mc-spoke/aviatrix"
+  version    = "8.0.0"
+
+  account                          = each.value.account
+  attached                         = each.value.attached
+  cidr                             = each.value.cidr
+  cloud                            = "gcp"
+  customized_spoke_vpc_routes      = each.value.customized_spoke_vpc_routes
+  enable_max_performance           = each.value.insane_mode ? each.value.enable_max_performance : true
+  included_advertised_spoke_routes = each.value.included_advertised_spoke_routes
+  insane_mode                      = each.value.insane_mode
+  instance_size                    = each.value.spoke_instance_size
+  region                           = each.value.region
+
+  transit_gw = each.value.transit_gw_name
+
+  name             = each.key
+  enable_bgp       = each.value.enable_bgp
+  local_as_number  = each.value.enable_bgp ? each.value.local_as_number : null
+  allocate_new_eip = each.value.allocate_new_eip
+  eip              = each.value.eip
+  ha_eip           = each.value.ha_eip
+  single_ip_snat   = each.value.single_ip_snat
+}
