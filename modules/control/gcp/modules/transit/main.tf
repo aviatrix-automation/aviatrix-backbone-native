@@ -857,8 +857,6 @@ module "mc-spoke" {
   transit_gw = each.value.transit_gw_name
 
   name             = each.key
-  enable_bgp       = each.value.enable_bgp
-  local_as_number  = each.value.enable_bgp ? each.value.local_as_number : null
   allocate_new_eip = each.value.allocate_new_eip
   eip              = each.value.eip
   ha_eip           = each.value.ha_eip
