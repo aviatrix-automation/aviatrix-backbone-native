@@ -53,6 +53,38 @@ locals {
     ]
   ])
 
+  external_device_pairs = {
+    for k, v in var.external_devices : k => {
+      transit_gw_name           = v.transit_gw_name
+      connection_name           = v.connection_name
+      pair_key                  = "${v.transit_gw_name}.${v.connection_name}"
+      remote_gateway_ip         = v.remote_gateway_ip
+      bgp_enabled               = v.bgp_enabled
+      bgp_remote_asn            = v.bgp_enabled ? v.bgp_remote_asn : null
+      backup_bgp_remote_as_num  = v.ha_enabled ? v.bgp_remote_asn : null
+      local_tunnel_cidr         = v.local_tunnel_cidr
+      remote_tunnel_cidr        = v.remote_tunnel_cidr
+      ha_enabled                = v.ha_enabled
+      backup_remote_gateway_ip  = v.ha_enabled ? v.backup_remote_gateway_ip : null
+      backup_local_tunnel_cidr  = v.ha_enabled ? v.backup_local_tunnel_cidr : null
+      backup_remote_tunnel_cidr = v.ha_enabled ? v.backup_remote_tunnel_cidr : null
+      enable_ikev2              = v.enable_ikev2
+      inspected_by_firenet      = v.inspected_by_firenet
+    }
+  }
+
+  external_inspection_policies = [
+    for k, v in local.external_device_pairs : {
+      transit_key     = v.transit_gw_name
+      connection_name = v.connection_name
+      pair_key        = v.pair_key
+    } if v.inspected_by_firenet && lookup(
+      { for t in var.transits : t.gw_name => t.fw_amount },
+      v.transit_gw_name,
+      0
+    ) > 0
+  ]
+
   hub_topologies = {
     for hub in var.ncc_hubs :
     hub.name => hub.preset_topology
@@ -815,16 +847,42 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   ]
 }
 
+resource "aviatrix_transit_external_device_conn" "external_device" {
+  for_each                  = local.external_device_pairs
+  vpc_id                    = module.mc_transit[each.value.transit_gw_name].transit_gateway.vpc_id
+  connection_name           = each.value.connection_name
+  gw_name                   = each.value.transit_gw_name
+  remote_gateway_ip         = each.value.remote_gateway_ip
+  backup_remote_gateway_ip  = each.value.ha_enabled ? each.value.backup_remote_gateway_ip : null
+  backup_bgp_remote_as_num  = each.value.ha_enabled ? each.value.bgp_remote_asn : null
+  connection_type           = each.value.bgp_enabled ? "bgp" : "static"
+  bgp_local_as_num          = each.value.bgp_enabled ? module.mc_transit[each.value.transit_gw_name].transit_gateway.local_as_number : null
+  bgp_remote_as_num         = each.value.bgp_enabled ? each.value.bgp_remote_asn : null
+  tunnel_protocol           = "IPsec"
+  direct_connect            = false
+  ha_enabled                = each.value.ha_enabled
+  local_tunnel_cidr         = each.value.local_tunnel_cidr
+  remote_tunnel_cidr        = each.value.remote_tunnel_cidr
+  backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
+  backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
+  enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
+  custom_algorithms         = false
+  phase1_local_identifier   = null
+
+  depends_on = [
+    module.mc_transit
+  ]
+}
+
 resource "aviatrix_transit_firenet_policy" "inspection_policies" {
   for_each = {
-    for policy in local.inspection_policies : policy.pair_key => policy
-
+    for p in concat(local.inspection_policies, local.external_inspection_policies) :
+    p.pair_key => p
     if lookup(
       { for t in var.transits : t.gw_name => t.inspection_enabled },
-      policy.transit_key,
+      p.transit_key,
       false
     )
-
   }
 
   transit_firenet_gateway_name = module.mc_transit[each.value.transit_key].transit_gateway.gw_name
@@ -833,7 +891,8 @@ resource "aviatrix_transit_firenet_policy" "inspection_policies" {
   depends_on = [
     aviatrix_firenet.firenet,
     aviatrix_firewall_instance_association.fw_associations,
-    aviatrix_transit_external_device_conn.bgp_lan_connections
+    aviatrix_transit_external_device_conn.bgp_lan_connections,
+    aviatrix_transit_external_device_conn.external_device
   ]
 }
 
