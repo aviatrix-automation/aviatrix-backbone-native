@@ -206,6 +206,16 @@ locals {
       backup_remote_tunnel_cidr = v.ha_enabled ? v.backup_remote_tunnel_cidr : null
       enable_ikev2              = v.enable_ikev2
       inspected_by_firenet      = v.inspected_by_firenet
+      # Custom IPsec algorithm parameters
+      custom_algorithms         = v.custom_algorithms
+      pre_shared_key            = v.pre_shared_key
+      phase_1_authentication    = v.phase_1_authentication
+      phase_1_dh_groups         = v.phase_1_dh_groups
+      phase_1_encryption        = v.phase_1_encryption
+      phase_2_authentication    = v.phase_2_authentication
+      phase_2_dh_groups         = v.phase_2_dh_groups
+      phase_2_encryption        = v.phase_2_encryption
+      phase1_local_identifier   = v.phase1_local_identifier
     }
   }
 
@@ -1010,8 +1020,16 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
   backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
   enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
-  custom_algorithms         = false
-  phase1_local_identifier   = null
+  # Custom IPsec algorithm support
+  custom_algorithms         = each.value.custom_algorithms
+  pre_shared_key            = each.value.pre_shared_key
+  phase_1_authentication    = each.value.phase_1_authentication
+  phase_1_dh_groups         = each.value.phase_1_dh_groups
+  phase_1_encryption        = each.value.phase_1_encryption
+  phase_2_authentication    = each.value.phase_2_authentication
+  phase_2_dh_groups         = each.value.phase_2_dh_groups
+  phase_2_encryption        = each.value.phase_2_encryption
+  phase1_local_identifier   = each.value.phase1_local_identifier
 
   depends_on = [
     module.mc-transit
