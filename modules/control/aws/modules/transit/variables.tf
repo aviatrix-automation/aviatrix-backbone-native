@@ -38,9 +38,9 @@ variable "transits" {
     egress_source_ranges        = optional(set(string), ["0.0.0.0/0"])
     lan_source_ranges           = optional(set(string), ["0.0.0.0/0"])
     # Learned CIDRs approval configuration
-    enable_learned_cidrs_approval   = optional(bool, false)
-    learned_cidrs_approval_mode     = optional(string, "gateway")
-    approved_learned_cidrs          = optional(set(string), [])
+    learned_cidr_approval      = optional(string, "false")
+    learned_cidrs_approval_mode = optional(string, null)
+    approved_learned_cidrs      = optional(list(string), null)
     inside_cidr_blocks = optional(map(object({
       connect_peer_1    = string
       ha_connect_peer_1 = string

@@ -462,9 +462,9 @@ module "mc_transit" {
   local_as_number               = each.value.aviatrix_gw_asn
   lan_cidr                      = each.value.lan_cidr
   # Learned CIDRs approval configuration
-  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
-  learned_cidrs_approval_mode   = each.value.learned_cidrs_approval_mode
-  approved_learned_cidrs        = length(each.value.approved_learned_cidrs) > 0 ? each.value.approved_learned_cidrs : null
+  learned_cidr_approval       = each.value.learned_cidr_approval
+  learned_cidrs_approval_mode = each.value.learned_cidrs_approval_mode
+  approved_learned_cidrs      = each.value.approved_learned_cidrs
   bgp_lan_interfaces = [
     for intf_type in [for hub in var.ncc_hubs : hub.name if hub.create] : {
       vpc_id     = google_compute_network.bgp_lan_vpcs[intf_type].name
