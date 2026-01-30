@@ -184,6 +184,7 @@ variable "external_devices" {
     # Custom IPsec algorithm parameters
     custom_algorithms         = optional(bool, false)
     pre_shared_key            = optional(string)
+    backup_pre_shared_key     = optional(string)
     phase_1_authentication    = optional(string)
     phase_1_dh_groups         = optional(string)
     phase_1_encryption        = optional(string)

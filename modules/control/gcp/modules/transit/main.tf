@@ -73,6 +73,7 @@ locals {
       # Custom IPsec algorithm parameters
       custom_algorithms         = v.custom_algorithms
       pre_shared_key            = v.pre_shared_key
+      backup_pre_shared_key     = v.backup_pre_shared_key
       phase_1_authentication    = v.phase_1_authentication
       phase_1_dh_groups         = v.phase_1_dh_groups
       phase_1_encryption        = v.phase_1_encryption
@@ -883,6 +884,7 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   # Custom IPsec algorithm support - only set when custom_algorithms is true
   custom_algorithms         = each.value.custom_algorithms
   pre_shared_key            = each.value.pre_shared_key
+  backup_pre_shared_key     = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
   phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
   phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
   phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
