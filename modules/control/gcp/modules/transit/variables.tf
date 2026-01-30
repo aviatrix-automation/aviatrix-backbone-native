@@ -191,6 +191,10 @@ variable "external_devices" {
     phase_2_dh_groups         = optional(string)
     phase_2_encryption        = optional(string)
     phase1_local_identifier   = optional(string)
+    # BGP learned CIDRs and manual advertisement parameters
+    enable_learned_cidrs_approval = optional(bool, false)
+    approved_cidrs                = optional(set(string))
+    manual_bgp_advertised_cidrs   = optional(list(string))
   }))
   default = {}
 }
