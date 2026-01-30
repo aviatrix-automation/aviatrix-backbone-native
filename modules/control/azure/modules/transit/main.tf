@@ -1026,7 +1026,7 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
   # Custom IPsec algorithm support - only set when custom_algorithms is true
   custom_algorithms         = each.value.custom_algorithms
-  pre_shared_key            = each.value.custom_algorithms ? each.value.pre_shared_key : null
+  pre_shared_key            = each.value.pre_shared_key
   phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
   phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
   phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
