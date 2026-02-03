@@ -16,6 +16,18 @@ locals {
     { for k, v in data.google_compute_subnetwork.existing_bgp_lan_subnets : k => v }
   )
 
+  # Merge created and existing Cloud Routers
+  bgp_lan_routers = merge(
+    { for k, v in google_compute_router.bgp_lan_routers : k => v },
+    { for k, v in data.google_compute_router.existing_bgp_lan_routers : k => v }
+  )
+
+  # Merge created and existing BGP addresses
+  bgp_lan_addresses = merge(
+    { for k, v in google_compute_address.bgp_lan_addresses : k => v },
+    { for k, v in data.google_compute_address.existing_bgp_lan_addresses : k => v }
+  )
+
   # Helper to get NCC hub ID (constructed for existing hubs, resource ID for created hubs)
   ncc_hub_ids = {
     for hub in var.ncc_hubs :
@@ -382,7 +394,7 @@ resource "google_compute_router" "bgp_lan_routers" {
         subnet_config = subnet_config
         intf_type  = intf_type
         asn        = transit.cloud_router_asn
-      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -421,7 +433,7 @@ resource "google_compute_address" "bgp_lan_addresses" {
           intf_type  = intf_type
           type       = "ha"
         }
-      ] if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
+      ] if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}-${pair.type}" => pair }
 
@@ -453,16 +465,18 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
   name                = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-int-pri"
   project             = each.value.project_id
   region              = each.value.region
-  router              = google_compute_router.bgp_lan_routers[each.key].name
+  router              = local.bgp_lan_routers[each.key].name
   subnetwork          = local.bgp_lan_subnets[each.key].self_link
-  private_ip_address  = google_compute_address.bgp_lan_addresses["${each.key}-pri"].address
+  private_ip_address  = local.bgp_lan_addresses["${each.key}-pri"].address
   redundant_interface = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
     data.google_compute_subnetwork.existing_bgp_lan_subnets,
     google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses,
     google_compute_router_interface.bgp_lan_interfaces_ha
   ]
 }
@@ -483,20 +497,22 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
   name               = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-int-hagw"
   project            = each.value.project_id
   region             = each.value.region
-  router             = google_compute_router.bgp_lan_routers[each.key].name
+  router             = local.bgp_lan_routers[each.key].name
   subnetwork         = local.bgp_lan_subnets[each.key].self_link
-  private_ip_address = google_compute_address.bgp_lan_addresses["${each.key}-ha"].address
+  private_ip_address = local.bgp_lan_addresses["${each.key}-ha"].address
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
     data.google_compute_subnetwork.existing_bgp_lan_subnets,
-    google_compute_address.bgp_lan_addresses
+    google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses
   ]
 }
 
 resource "google_compute_firewall" "bgp_lan_bgp" {
-  for_each = { for hub in var.ncc_hubs : hub.name => hub }
+  for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create }
 
   name    = "bgp-lan-${each.value.name}-allow-bgp"
   project = var.project_id
@@ -753,7 +769,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-pri"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_pri[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -762,6 +778,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
     module.mc_transit
   ]
@@ -784,7 +801,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-ha"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -793,6 +810,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
     module.mc_transit
   ]
@@ -815,7 +833,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-pri-to-ha"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -824,6 +842,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
     module.mc_transit
   ]
@@ -846,7 +865,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-ha-to-pri"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_pri[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -855,6 +874,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
     module.mc_transit
   ]
@@ -880,11 +900,11 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   tunnel_protocol           = "LAN"
   bgp_local_as_num          = [for t in var.transits : t.aviatrix_gw_asn if t.gw_name == each.value.gw_name][0]
   bgp_remote_as_num         = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
-  remote_lan_ip             = google_compute_address.bgp_lan_addresses["${each.key}-pri"].address
+  remote_lan_ip             = local.bgp_lan_addresses["${each.key}-pri"].address
   local_lan_ip              = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   ha_enabled                = true
   backup_bgp_remote_as_num  = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
-  backup_remote_lan_ip      = google_compute_address.bgp_lan_addresses["${each.key}-ha"].address
+  backup_remote_lan_ip      = local.bgp_lan_addresses["${each.key}-ha"].address
   backup_local_lan_ip       = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   enable_bgp_lan_activemesh = true
 
@@ -892,7 +912,8 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
 
   depends_on = [
     module.mc_transit,
-    google_compute_address.bgp_lan_addresses
+    google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses
   ]
 }
 
