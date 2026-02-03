@@ -649,7 +649,6 @@ module "pan_fw" {
 
   project = each.value.project_id
   zone    = each.value.zone
-  region  = each.value.region
 
   name         = each.key
   custom_image = "${each.value.firewall_image}-${each.value.firewall_image_version}"
