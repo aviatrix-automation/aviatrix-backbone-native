@@ -136,7 +136,7 @@ resource "google_network_connectivity_group" "center_group" {
   auto_accept {
     auto_accept_projects = distinct([
       for transit in var.transits : transit.project_id
-      if lookup(transit.bgp_lan_subnets, each.key, "") != ""
+      if contains(keys(transit.bgp_lan_subnets), each.key)
     ])
   }
 
@@ -169,7 +169,7 @@ resource "google_network_connectivity_group" "default_group" {
 
   auto_accept {
     auto_accept_projects = distinct(flatten([
-      [for transit in var.transits : transit.project_id if lookup(transit.bgp_lan_subnets, each.key, "") != ""],
+      [for transit in var.transits : transit.project_id if contains(keys(transit.bgp_lan_subnets), each.key)],
       [for spoke in var.spokes : spoke.project_id if spoke.ncc_hub == each.key]
     ]))
   }
@@ -337,13 +337,13 @@ resource "google_compute_network" "bgp_lan_vpcs" {
 resource "google_compute_subnetwork" "bgp_lan_subnets" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
-        gw_name    = transit.gw_name
-        project_id = transit.project_id
-        region     = transit.region
-        subnet     = subnet
-        intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
+        gw_name       = transit.gw_name
+        project_id    = transit.project_id
+        region        = transit.region
+        subnet_config = subnet_config
+        intf_type     = intf_type
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -351,7 +351,7 @@ resource "google_compute_subnetwork" "bgp_lan_subnets" {
   project       = each.value.project_id
   region        = each.value.region
   network       = google_compute_network.bgp_lan_vpcs[each.value.intf_type].self_link
-  ip_cidr_range = each.value.subnet
+  ip_cidr_range = each.value.subnet_config.cidr
   depends_on    = [google_compute_network.bgp_lan_vpcs]
 
   lifecycle {

@@ -3,8 +3,18 @@ module "transit" {
   source         = "./modules/transit"
   project_id     = "rtrentin-01"
   ncc_hubs = [
-    { name = "ai-1", create = true, preset_topology = "MESH" },
-    { name = "ai-2", create = true, preset_topology = "MESH" },
+    {
+      name                 = "ai-1"
+      create               = false
+      existing_vpc_name    = "bgp-lan-ai-1-vpc"          # REQUIRED when create = false
+      existing_vpc_project = "rtrentin-01"               # Optional: defaults to project_id
+      preset_topology      = "MESH"
+    },
+    {
+      name            = "ai-2"
+      create          = true
+      preset_topology = "MESH"
+    },
   ]
   transits = [
     {
@@ -22,7 +32,10 @@ module "transit" {
       egress_cidr         = "10.1.243.0/24"
       gw_size             = "n4-highcpu-8"
       bgp_lan_subnets = {
-        ai-1 = "10.1.0.0/24"
+        ai-1 = {
+          cidr                 = "10.1.0.0/24"
+          existing_subnet_name = "gcp-us-transit-bgp-lan-ai-1-subnet"  # For existing VPC
+        }
       }
       cloud_router_asn            = 16550
       aviatrix_gw_asn             = 65511
@@ -52,7 +65,9 @@ module "transit" {
       egress_cidr         = "10.2.243.0/24"
       gw_size             = "n4-highcpu-8"
       bgp_lan_subnets = {
-        ai-2 = "10.2.0.0/24"
+        ai-2 = {
+          cidr = "10.2.0.0/24"  # For new VPC (ai-2 has create = true)
+        }
       }
       cloud_router_asn            = 16550
       aviatrix_gw_asn             = 65512
