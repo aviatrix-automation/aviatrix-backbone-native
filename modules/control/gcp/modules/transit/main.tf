@@ -363,27 +363,30 @@ resource "google_compute_subnetwork" "bgp_lan_subnets" {
 resource "google_compute_router" "bgp_lan_routers" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
         region     = transit.region
-        subnet     = subnet
+        subnet_config = subnet_config
         intf_type  = intf_type
         asn        = transit.cloud_router_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name    = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-router"
   project = each.value.project_id
   region  = each.value.region
-  network = google_compute_network.bgp_lan_vpcs[each.value.intf_type].self_link
+  network = local.bgp_lan_vpcs[each.value.intf_type].self_link
 
   bgp {
     asn = each.value.asn
   }
 
-  depends_on = [google_compute_network.bgp_lan_vpcs]
+  depends_on = [
+    google_compute_network.bgp_lan_vpcs,
+    data.google_compute_network.existing_bgp_lan_vpcs
+  ]
 }
 
 resource "google_compute_address" "bgp_lan_addresses" {
@@ -480,19 +483,21 @@ resource "google_compute_firewall" "bgp_lan_bgp" {
 
   name    = "bgp-lan-${each.value.name}-allow-bgp"
   project = var.project_id
-  network = google_compute_network.bgp_lan_vpcs[each.value.name].self_link
+  network = local.bgp_lan_vpcs[each.value.name].self_link
 
   allow {
     protocol = "tcp"
     ports    = ["179"]
   }
 
-  source_ranges = [for s in google_compute_subnetwork.bgp_lan_subnets : s.ip_cidr_range if s.network == google_compute_network.bgp_lan_vpcs[each.value.name].self_link]
+  source_ranges = [for s in local.bgp_lan_subnets : s.ip_cidr_range if s.network == local.bgp_lan_vpcs[each.value.name].self_link]
   target_tags   = ["bgp-lan"]
 
   depends_on = [
     google_compute_network.bgp_lan_vpcs,
-    google_compute_subnetwork.bgp_lan_subnets
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_network.existing_bgp_lan_vpcs,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
   ]
 }
 
