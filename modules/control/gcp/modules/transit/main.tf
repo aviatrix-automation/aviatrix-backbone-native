@@ -428,10 +428,13 @@ resource "google_compute_address" "bgp_lan_addresses" {
   name         = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-address-${each.value.type}"
   project      = each.value.project_id
   region       = each.value.region
-  subnetwork   = google_compute_subnetwork.bgp_lan_subnets["${each.value.gw_name}-bgp-lan-${each.value.intf_type}"].self_link
+  subnetwork   = local.bgp_lan_subnets["${each.value.gw_name}-bgp-lan-${each.value.intf_type}"].self_link
   address_type = "INTERNAL"
 
-  depends_on = [google_compute_subnetwork.bgp_lan_subnets]
+  depends_on = [
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
+  ]
 }
 
 resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
@@ -451,13 +454,14 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
   project             = each.value.project_id
   region              = each.value.region
   router              = google_compute_router.bgp_lan_routers[each.key].name
-  subnetwork          = google_compute_subnetwork.bgp_lan_subnets[each.key].self_link
+  subnetwork          = local.bgp_lan_subnets[each.key].self_link
   private_ip_address  = google_compute_address.bgp_lan_addresses["${each.key}-pri"].address
   redundant_interface = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets,
     google_compute_address.bgp_lan_addresses,
     google_compute_router_interface.bgp_lan_interfaces_ha
   ]
@@ -480,12 +484,13 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
   project            = each.value.project_id
   region             = each.value.region
   router             = google_compute_router.bgp_lan_routers[each.key].name
-  subnetwork         = google_compute_subnetwork.bgp_lan_subnets[each.key].self_link
+  subnetwork         = local.bgp_lan_subnets[each.key].self_link
   private_ip_address = google_compute_address.bgp_lan_addresses["${each.key}-ha"].address
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets,
     google_compute_address.bgp_lan_addresses
   ]
 }
