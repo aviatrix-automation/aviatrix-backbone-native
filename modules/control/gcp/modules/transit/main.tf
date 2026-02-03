@@ -4,12 +4,6 @@ locals {
     transit.gw_name => keys(transit.bgp_lan_subnets)
   }
 
-  # Merge created and existing NCC hubs
-  ncc_hubs = merge(
-    { for k, v in google_network_connectivity_hub.ncc_hubs : k => v },
-    { for k, v in data.google_network_connectivity_hub.existing_ncc_hubs : k => v }
-  )
-
   # Merge created and existing BGP LAN VPCs
   bgp_lan_vpcs = merge(
     { for k, v in google_compute_network.bgp_lan_vpcs : k => v },
@@ -21,6 +15,12 @@ locals {
     { for k, v in google_compute_subnetwork.bgp_lan_subnets : k => v },
     { for k, v in data.google_compute_subnetwork.existing_bgp_lan_subnets : k => v }
   )
+
+  # Helper to get NCC hub ID (constructed for existing hubs, resource ID for created hubs)
+  ncc_hub_ids = {
+    for hub in var.ncc_hubs :
+    hub.name => hub.create ? google_network_connectivity_hub.ncc_hubs[hub.name].id : "projects/${var.project_id}/locations/global/hubs/ncc-${hub.name}"
+  }
 
   fws = flatten([
     for transit in var.transits : concat(
@@ -136,7 +136,7 @@ resource "google_network_connectivity_group" "center_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "center"
-  hub     = local.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
@@ -147,8 +147,7 @@ resource "google_network_connectivity_group" "center_group" {
   }
 
   depends_on = [
-    google_network_connectivity_hub.ncc_hubs,
-    data.google_network_connectivity_hub.existing_ncc_hubs
+    google_network_connectivity_hub.ncc_hubs
   ]
 }
 
@@ -156,7 +155,7 @@ resource "google_network_connectivity_group" "edge_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "edge"
-  hub     = local.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
@@ -167,8 +166,7 @@ resource "google_network_connectivity_group" "edge_group" {
   }
 
   depends_on = [
-    google_network_connectivity_hub.ncc_hubs,
-    data.google_network_connectivity_hub.existing_ncc_hubs
+    google_network_connectivity_hub.ncc_hubs
   ]
 }
 
@@ -176,7 +174,7 @@ resource "google_network_connectivity_group" "default_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "MESH" }
 
   name    = "default"
-  hub     = local.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
@@ -187,8 +185,7 @@ resource "google_network_connectivity_group" "default_group" {
   }
 
   depends_on = [
-    google_network_connectivity_hub.ncc_hubs,
-    data.google_network_connectivity_hub.existing_ncc_hubs
+    google_network_connectivity_hub.ncc_hubs
   ]
 }
 
@@ -201,14 +198,14 @@ resource "google_network_connectivity_spoke" "avx_spokes_star" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) && local.hub_topologies[intf_type] == "STAR"
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type) && local.hub_topologies[intf_type] == "STAR"
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = local.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hub_ids[each.value.intf_type]
   group    = "center"
 
   linked_router_appliance_instances {
@@ -250,14 +247,14 @@ resource "google_network_connectivity_spoke" "avx_spokes_mesh" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) && local.hub_topologies[intf_type] == "MESH"
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type) && local.hub_topologies[intf_type] == "MESH"
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = local.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hub_ids[each.value.intf_type]
   group    = "default"
 
   linked_router_appliance_instances {
@@ -297,7 +294,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_star" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = local.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hub_ids[each.value.ncc_hub]
   group    = "edge"
 
   linked_vpc_network {
@@ -322,7 +319,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_mesh" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = local.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hub_ids[each.value.ncc_hub]
   group    = "default"
 
   linked_vpc_network {
@@ -385,7 +382,7 @@ resource "google_compute_router" "bgp_lan_routers" {
         subnet_config = subnet_config
         intf_type  = intf_type
         asn        = transit.cloud_router_asn
-      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -446,7 +443,7 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -475,7 +472,7 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -494,7 +491,7 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
 }
 
 resource "google_compute_firewall" "bgp_lan_bgp" {
-  for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create }
+  for_each = { for hub in var.ncc_hubs : hub.name => hub }
 
   name    = "bgp-lan-${each.value.name}-allow-bgp"
   project = var.project_id
@@ -744,7 +741,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -775,7 +772,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -806,7 +803,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -837,7 +834,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -868,7 +865,7 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
         subnet                      = subnet
         intf_type                   = intf_type
         manual_bgp_advertised_cidrs = transit.manual_bgp_advertised_cidrs
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
   vpc_id                    = module.mc_transit[each.value.gw_name].transit_gateway.vpc_id
