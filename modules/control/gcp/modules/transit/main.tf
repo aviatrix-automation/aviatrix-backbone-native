@@ -4,6 +4,18 @@ locals {
     transit.gw_name => keys(transit.bgp_lan_subnets)
   }
 
+  # Merge created and existing BGP LAN VPCs
+  bgp_lan_vpcs = merge(
+    { for k, v in google_compute_network.bgp_lan_vpcs : k => v },
+    { for k, v in data.google_compute_network.existing_bgp_lan_vpcs : k => v }
+  )
+
+  # Merge created and existing BGP LAN subnets
+  bgp_lan_subnets = merge(
+    { for k, v in google_compute_subnetwork.bgp_lan_subnets : k => v },
+    { for k, v in data.google_compute_subnetwork.existing_bgp_lan_subnets : k => v }
+  )
+
   fws = flatten([
     for transit in var.transits : concat(
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
@@ -43,12 +55,11 @@ locals {
 
   inspection_policies = flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
         transit_key     = transit.gw_name
         connection_name = "external-${intf_type}-${transit.gw_name}"
         pair_key        = "${transit.gw_name}-bgp-lan-${intf_type}"
-      } if subnet != "" &&
-      contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) &&
+      } if subnet_config.cidr != "" &&
       transit.fw_amount > 0
     ]
   ])
@@ -513,23 +524,25 @@ module "mc_transit" {
   learned_cidrs_approval_mode = each.value.learned_cidrs_approval_mode
   approved_learned_cidrs      = each.value.approved_learned_cidrs
   bgp_lan_interfaces = [
-    for intf_type in [for hub in var.ncc_hubs : hub.name if hub.create] : {
-      vpc_id     = google_compute_network.bgp_lan_vpcs[intf_type].name
-      subnet     = each.value.bgp_lan_subnets[intf_type]
+    for intf_type in [for hub in var.ncc_hubs : hub.name] : {
+      vpc_id     = local.bgp_lan_vpcs[intf_type].name
+      subnet     = each.value.bgp_lan_subnets[intf_type].cidr
       create_vpc = false
-    } if lookup(each.value.bgp_lan_subnets, intf_type, "") != ""
+    } if contains(keys(each.value.bgp_lan_subnets), intf_type) && each.value.bgp_lan_subnets[intf_type].cidr != ""
   ]
 
   ha_bgp_lan_interfaces = [
-    for intf_type in [for hub in var.ncc_hubs : hub.name if hub.create] : {
-      vpc_id     = google_compute_network.bgp_lan_vpcs[intf_type].name
-      subnet     = each.value.bgp_lan_subnets[intf_type]
+    for intf_type in [for hub in var.ncc_hubs : hub.name] : {
+      vpc_id     = local.bgp_lan_vpcs[intf_type].name
+      subnet     = each.value.bgp_lan_subnets[intf_type].cidr
       create_vpc = false
-    } if lookup(each.value.bgp_lan_subnets, intf_type, "") != ""
+    } if contains(keys(each.value.bgp_lan_subnets), intf_type) && each.value.bgp_lan_subnets[intf_type].cidr != ""
   ]
   depends_on = [
     google_compute_network.bgp_lan_vpcs,
-    google_compute_subnetwork.bgp_lan_subnets
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_network.existing_bgp_lan_vpcs,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
   ]
 }
 
