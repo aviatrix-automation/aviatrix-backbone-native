@@ -74,6 +74,7 @@ data "google_compute_router" "existing_bgp_lan_routers" {
         project_id = transit.project_id
         region     = transit.region
         intf_type  = intf_type
+        vpc_name   = [for hub in var.ncc_hubs : hub.existing_vpc_name if hub.name == intf_type && !hub.create][0]
       } if subnet_config.cidr != "" &&
            !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
@@ -81,6 +82,7 @@ data "google_compute_router" "existing_bgp_lan_routers" {
 
   name    = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-router"
   region  = each.value.region
+  network = each.value.vpc_name
   project = each.value.project_id
 }
 
