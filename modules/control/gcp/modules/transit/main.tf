@@ -4,6 +4,12 @@ locals {
     transit.gw_name => keys(transit.bgp_lan_subnets)
   }
 
+  # Merge created and existing NCC hubs
+  ncc_hubs = merge(
+    { for k, v in google_network_connectivity_hub.ncc_hubs : k => v },
+    { for k, v in data.google_network_connectivity_hub.existing_ncc_hubs : k => v }
+  )
+
   # Merge created and existing BGP LAN VPCs
   bgp_lan_vpcs = merge(
     { for k, v in google_compute_network.bgp_lan_vpcs : k => v },
@@ -118,7 +124,7 @@ locals {
 }
 
 resource "google_network_connectivity_hub" "ncc_hubs" {
-  for_each = { for hub in var.ncc_hubs : hub.name => hub }
+  for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create }
 
   name            = "ncc-${each.value.name}"
   project         = var.project_id
@@ -130,7 +136,7 @@ resource "google_network_connectivity_group" "center_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "center"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hubs[each.key].id
   project = var.project_id
 
   auto_accept {
@@ -140,14 +146,17 @@ resource "google_network_connectivity_group" "center_group" {
     ])
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs,
+    data.google_network_connectivity_hub.existing_ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_group" "edge_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "edge"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hubs[each.key].id
   project = var.project_id
 
   auto_accept {
@@ -157,14 +166,17 @@ resource "google_network_connectivity_group" "edge_group" {
     ])
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs,
+    data.google_network_connectivity_hub.existing_ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_group" "default_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "MESH" }
 
   name    = "default"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hubs[each.key].id
   project = var.project_id
 
   auto_accept {
@@ -174,7 +186,10 @@ resource "google_network_connectivity_group" "default_group" {
     ]))
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs,
+    data.google_network_connectivity_hub.existing_ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_spoke" "avx_spokes_star" {
@@ -193,7 +208,7 @@ resource "google_network_connectivity_spoke" "avx_spokes_star" {
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hubs[each.value.intf_type].id
   group    = "center"
 
   linked_router_appliance_instances {
@@ -242,7 +257,7 @@ resource "google_network_connectivity_spoke" "avx_spokes_mesh" {
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hubs[each.value.intf_type].id
   group    = "default"
 
   linked_router_appliance_instances {
@@ -282,7 +297,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_star" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hubs[each.value.ncc_hub].id
   group    = "edge"
 
   linked_vpc_network {
@@ -307,7 +322,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_mesh" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hubs[each.value.ncc_hub].id
   group    = "default"
 
   linked_vpc_network {

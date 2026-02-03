@@ -32,6 +32,14 @@ data "google_compute_subnetwork" "lan_subnetwork" {
   depends_on = [module.mc_transit]
 }
 
+# Data source for existing NCC hubs (when create = false)
+data "google_network_connectivity_hub" "existing_ncc_hubs" {
+  for_each = { for hub in var.ncc_hubs : hub.name => hub if !hub.create }
+
+  name    = "ncc-${each.value.name}"
+  project = var.project_id
+}
+
 # Data source for existing BGP LAN VPCs (when create = false)
 data "google_compute_network" "existing_bgp_lan_vpcs" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if !hub.create }
