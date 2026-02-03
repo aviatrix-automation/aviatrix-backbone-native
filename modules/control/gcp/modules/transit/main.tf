@@ -421,7 +421,7 @@ resource "google_compute_address" "bgp_lan_addresses" {
           intf_type  = intf_type
           type       = "ha"
         }
-      ] if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      ] if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}-${pair.type}" => pair }
 
