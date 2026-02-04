@@ -957,6 +957,41 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   ]
 }
 
+resource "aviatrix_transit_external_device_conn" "external_device" {
+  for_each                  = local.external_device_pairs
+  vpc_id                    = module.mc_transit[each.value.transit_gw_name].transit_gateway.vpc_id
+  connection_name           = each.value.connection_name
+  gw_name                   = each.value.transit_gw_name
+  remote_gateway_ip         = each.value.remote_gateway_ip
+  backup_remote_gateway_ip  = each.value.ha_enabled ? each.value.backup_remote_gateway_ip : null
+  backup_bgp_remote_as_num  = each.value.ha_enabled ? each.value.bgp_remote_asn : null
+  connection_type           = each.value.bgp_enabled ? "bgp" : "static"
+  bgp_local_as_num          = each.value.bgp_enabled ? module.mc_transit[each.value.transit_gw_name].transit_gateway.local_as_number : null
+  bgp_remote_as_num         = each.value.bgp_enabled ? each.value.bgp_remote_asn : null
+  tunnel_protocol           = "IPsec"
+  direct_connect            = false
+  ha_enabled                = each.value.ha_enabled
+  local_tunnel_cidr         = each.value.local_tunnel_cidr
+  remote_tunnel_cidr        = each.value.remote_tunnel_cidr
+  backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
+  backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
+  enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
+  # Custom IPsec algorithm support - only set when custom_algorithms is true
+  custom_algorithms         = each.value.custom_algorithms
+  pre_shared_key            = each.value.custom_algorithms ? each.value.pre_shared_key : null
+  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
+  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
+  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
+  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
+  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
+  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
+  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
+
+  depends_on = [
+    module.mc_transit
+  ]
+}
+
 resource "aviatrix_transit_firenet_policy" "inspection_policies" {
   for_each = {
     for p in concat(local.inspection_policies, local.external_inspection_policies) :
