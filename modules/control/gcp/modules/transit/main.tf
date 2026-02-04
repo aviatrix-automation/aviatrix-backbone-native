@@ -4,6 +4,36 @@ locals {
     transit.gw_name => keys(transit.bgp_lan_subnets)
   }
 
+  # Merge created and existing BGP LAN VPCs
+  bgp_lan_vpcs = merge(
+    { for k, v in google_compute_network.bgp_lan_vpcs : k => v },
+    { for k, v in data.google_compute_network.existing_bgp_lan_vpcs : k => v }
+  )
+
+  # Merge created and existing BGP LAN subnets
+  bgp_lan_subnets = merge(
+    { for k, v in google_compute_subnetwork.bgp_lan_subnets : k => v },
+    { for k, v in data.google_compute_subnetwork.existing_bgp_lan_subnets : k => v }
+  )
+
+  # Merge created and existing Cloud Routers
+  bgp_lan_routers = merge(
+    { for k, v in google_compute_router.bgp_lan_routers : k => v },
+    { for k, v in data.google_compute_router.existing_bgp_lan_routers : k => v }
+  )
+
+  # Merge created and existing BGP addresses
+  bgp_lan_addresses = merge(
+    { for k, v in google_compute_address.bgp_lan_addresses : k => v },
+    { for k, v in data.google_compute_address.existing_bgp_lan_addresses : k => v }
+  )
+
+  # Helper to get NCC hub ID (constructed for existing hubs, resource ID for created hubs)
+  ncc_hub_ids = {
+    for hub in var.ncc_hubs :
+    hub.name => hub.create ? google_network_connectivity_hub.ncc_hubs[hub.name].id : "projects/${var.project_id}/locations/global/hubs/ncc-${hub.name}"
+  }
+
   fws = flatten([
     for transit in var.transits : concat(
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
@@ -43,12 +73,11 @@ locals {
 
   inspection_policies = flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
         transit_key     = transit.gw_name
         connection_name = "external-${intf_type}-${transit.gw_name}"
         pair_key        = "${transit.gw_name}-bgp-lan-${intf_type}"
-      } if subnet != "" &&
-      contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) &&
+      } if subnet_config.cidr != "" &&
       transit.fw_amount > 0
     ]
   ])
@@ -73,6 +102,7 @@ locals {
       # Custom IPsec algorithm parameters
       custom_algorithms         = v.custom_algorithms
       pre_shared_key            = v.pre_shared_key
+      backup_pre_shared_key     = v.backup_pre_shared_key
       phase_1_authentication    = v.phase_1_authentication
       phase_1_dh_groups         = v.phase_1_dh_groups
       phase_1_encryption        = v.phase_1_encryption
@@ -80,6 +110,10 @@ locals {
       phase_2_dh_groups         = v.phase_2_dh_groups
       phase_2_encryption        = v.phase_2_encryption
       phase1_local_identifier   = v.phase1_local_identifier
+      # BGP learned CIDRs and manual advertisement parameters
+      enable_learned_cidrs_approval = v.enable_learned_cidrs_approval
+      approved_cidrs                = v.approved_cidrs
+      manual_bgp_advertised_cidrs   = v.manual_bgp_advertised_cidrs
     }
   }
 
@@ -102,7 +136,7 @@ locals {
 }
 
 resource "google_network_connectivity_hub" "ncc_hubs" {
-  for_each = { for hub in var.ncc_hubs : hub.name => hub }
+  for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create }
 
   name            = "ncc-${each.value.name}"
   project         = var.project_id
@@ -114,24 +148,26 @@ resource "google_network_connectivity_group" "center_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "center"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
     auto_accept_projects = distinct([
       for transit in var.transits : transit.project_id
-      if lookup(transit.bgp_lan_subnets, each.key, "") != ""
+      if contains(keys(transit.bgp_lan_subnets), each.key)
     ])
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_group" "edge_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "STAR" }
 
   name    = "edge"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
@@ -141,24 +177,28 @@ resource "google_network_connectivity_group" "edge_group" {
     ])
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_group" "default_group" {
   for_each = { for hub in var.ncc_hubs : hub.name => hub if hub.create && hub.preset_topology == "MESH" }
 
   name    = "default"
-  hub     = google_network_connectivity_hub.ncc_hubs[each.key].id
+  hub     = local.ncc_hub_ids[each.key]
   project = var.project_id
 
   auto_accept {
     auto_accept_projects = distinct(flatten([
-      [for transit in var.transits : transit.project_id if lookup(transit.bgp_lan_subnets, each.key, "") != ""],
+      [for transit in var.transits : transit.project_id if contains(keys(transit.bgp_lan_subnets), each.key)],
       [for spoke in var.spokes : spoke.project_id if spoke.ncc_hub == each.key]
     ]))
   }
 
-  depends_on = [google_network_connectivity_hub.ncc_hubs]
+  depends_on = [
+    google_network_connectivity_hub.ncc_hubs
+  ]
 }
 
 resource "google_network_connectivity_spoke" "avx_spokes_star" {
@@ -170,14 +210,14 @@ resource "google_network_connectivity_spoke" "avx_spokes_star" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) && local.hub_topologies[intf_type] == "STAR"
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type) && local.hub_topologies[intf_type] == "STAR"
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hub_ids[each.value.intf_type]
   group    = "center"
 
   linked_router_appliance_instances {
@@ -219,14 +259,14 @@ resource "google_network_connectivity_spoke" "avx_spokes_mesh" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type) && local.hub_topologies[intf_type] == "MESH"
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type) && local.hub_topologies[intf_type] == "MESH"
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name     = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-to-avx"
   project  = each.value.project_id
   location = each.value.region
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.intf_type].id
+  hub      = local.ncc_hub_ids[each.value.intf_type]
   group    = "default"
 
   linked_router_appliance_instances {
@@ -266,7 +306,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_star" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hub_ids[each.value.ncc_hub]
   group    = "edge"
 
   linked_vpc_network {
@@ -291,7 +331,7 @@ resource "google_network_connectivity_spoke" "ncc_spokes_mesh" {
   name     = "${each.value.vpc_name}-spoke-${each.value.ncc_hub}"
   project  = each.value.project_id
   location = "global"
-  hub      = google_network_connectivity_hub.ncc_hubs[each.value.ncc_hub].id
+  hub      = local.ncc_hub_ids[each.value.ncc_hub]
   group    = "default"
 
   linked_vpc_network {
@@ -321,13 +361,13 @@ resource "google_compute_network" "bgp_lan_vpcs" {
 resource "google_compute_subnetwork" "bgp_lan_subnets" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
-        gw_name    = transit.gw_name
-        project_id = transit.project_id
-        region     = transit.region
-        subnet     = subnet
-        intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
+        gw_name       = transit.gw_name
+        project_id    = transit.project_id
+        region        = transit.region
+        subnet_config = subnet_config
+        intf_type     = intf_type
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -335,7 +375,7 @@ resource "google_compute_subnetwork" "bgp_lan_subnets" {
   project       = each.value.project_id
   region        = each.value.region
   network       = google_compute_network.bgp_lan_vpcs[each.value.intf_type].self_link
-  ip_cidr_range = each.value.subnet
+  ip_cidr_range = each.value.subnet_config.cidr
   depends_on    = [google_compute_network.bgp_lan_vpcs]
 
   lifecycle {
@@ -347,27 +387,30 @@ resource "google_compute_subnetwork" "bgp_lan_subnets" {
 resource "google_compute_router" "bgp_lan_routers" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
-      for intf_type, subnet in transit.bgp_lan_subnets : {
+      for intf_type, subnet_config in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
         region     = transit.region
-        subnet     = subnet
+        subnet_config = subnet_config
         intf_type  = intf_type
         asn        = transit.cloud_router_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name    = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-router"
   project = each.value.project_id
   region  = each.value.region
-  network = google_compute_network.bgp_lan_vpcs[each.value.intf_type].self_link
+  network = local.bgp_lan_vpcs[each.value.intf_type].self_link
 
   bgp {
     asn = each.value.asn
   }
 
-  depends_on = [google_compute_network.bgp_lan_vpcs]
+  depends_on = [
+    google_compute_network.bgp_lan_vpcs,
+    data.google_compute_network.existing_bgp_lan_vpcs
+  ]
 }
 
 resource "google_compute_address" "bgp_lan_addresses" {
@@ -397,10 +440,13 @@ resource "google_compute_address" "bgp_lan_addresses" {
   name         = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-address-${each.value.type}"
   project      = each.value.project_id
   region       = each.value.region
-  subnetwork   = google_compute_subnetwork.bgp_lan_subnets["${each.value.gw_name}-bgp-lan-${each.value.intf_type}"].self_link
+  subnetwork   = local.bgp_lan_subnets["${each.value.gw_name}-bgp-lan-${each.value.intf_type}"].self_link
   address_type = "INTERNAL"
 
-  depends_on = [google_compute_subnetwork.bgp_lan_subnets]
+  depends_on = [
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
+  ]
 }
 
 resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
@@ -412,22 +458,25 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name                = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-int-pri"
   project             = each.value.project_id
   region              = each.value.region
-  router              = google_compute_router.bgp_lan_routers[each.key].name
-  subnetwork          = google_compute_subnetwork.bgp_lan_subnets[each.key].self_link
-  private_ip_address  = google_compute_address.bgp_lan_addresses["${each.key}-pri"].address
+  router              = local.bgp_lan_routers[each.key].name
+  subnetwork          = local.bgp_lan_subnets[each.key].self_link
+  private_ip_address  = local.bgp_lan_addresses["${each.key}-pri"].address
   redundant_interface = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets,
     google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses,
     google_compute_router_interface.bgp_lan_interfaces_ha
   ]
 }
@@ -441,21 +490,24 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
         region     = transit.region
         subnet     = subnet
         intf_type  = intf_type
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name               = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-int-hagw"
   project            = each.value.project_id
   region             = each.value.region
-  router             = google_compute_router.bgp_lan_routers[each.key].name
-  subnetwork         = google_compute_subnetwork.bgp_lan_subnets[each.key].self_link
-  private_ip_address = google_compute_address.bgp_lan_addresses["${each.key}-ha"].address
+  router             = local.bgp_lan_routers[each.key].name
+  subnetwork         = local.bgp_lan_subnets[each.key].self_link
+  private_ip_address = local.bgp_lan_addresses["${each.key}-ha"].address
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_subnetwork.bgp_lan_subnets,
-    google_compute_address.bgp_lan_addresses
+    data.google_compute_subnetwork.existing_bgp_lan_subnets,
+    google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses
   ]
 }
 
@@ -464,19 +516,21 @@ resource "google_compute_firewall" "bgp_lan_bgp" {
 
   name    = "bgp-lan-${each.value.name}-allow-bgp"
   project = var.project_id
-  network = google_compute_network.bgp_lan_vpcs[each.value.name].self_link
+  network = local.bgp_lan_vpcs[each.value.name].self_link
 
   allow {
     protocol = "tcp"
     ports    = ["179"]
   }
 
-  source_ranges = [for s in google_compute_subnetwork.bgp_lan_subnets : s.ip_cidr_range if s.network == google_compute_network.bgp_lan_vpcs[each.value.name].self_link]
+  source_ranges = [for s in local.bgp_lan_subnets : s.ip_cidr_range if s.network == local.bgp_lan_vpcs[each.value.name].self_link]
   target_tags   = ["bgp-lan"]
 
   depends_on = [
     google_compute_network.bgp_lan_vpcs,
-    google_compute_subnetwork.bgp_lan_subnets
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_network.existing_bgp_lan_vpcs,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
   ]
 }
 
@@ -508,23 +562,25 @@ module "mc_transit" {
   learned_cidrs_approval_mode = each.value.learned_cidrs_approval_mode
   approved_learned_cidrs      = each.value.approved_learned_cidrs
   bgp_lan_interfaces = [
-    for intf_type in [for hub in var.ncc_hubs : hub.name if hub.create] : {
-      vpc_id     = google_compute_network.bgp_lan_vpcs[intf_type].name
-      subnet     = each.value.bgp_lan_subnets[intf_type]
+    for intf_type in [for hub in var.ncc_hubs : hub.name] : {
+      vpc_id     = local.bgp_lan_vpcs[intf_type].name
+      subnet     = each.value.bgp_lan_subnets[intf_type].cidr
       create_vpc = false
-    } if lookup(each.value.bgp_lan_subnets, intf_type, "") != ""
+    } if contains(keys(each.value.bgp_lan_subnets), intf_type) && each.value.bgp_lan_subnets[intf_type].cidr != ""
   ]
 
   ha_bgp_lan_interfaces = [
-    for intf_type in [for hub in var.ncc_hubs : hub.name if hub.create] : {
-      vpc_id     = google_compute_network.bgp_lan_vpcs[intf_type].name
-      subnet     = each.value.bgp_lan_subnets[intf_type]
+    for intf_type in [for hub in var.ncc_hubs : hub.name] : {
+      vpc_id     = local.bgp_lan_vpcs[intf_type].name
+      subnet     = each.value.bgp_lan_subnets[intf_type].cidr
       create_vpc = false
-    } if lookup(each.value.bgp_lan_subnets, intf_type, "") != ""
+    } if contains(keys(each.value.bgp_lan_subnets), intf_type) && each.value.bgp_lan_subnets[intf_type].cidr != ""
   ]
   depends_on = [
     google_compute_network.bgp_lan_vpcs,
-    google_compute_subnetwork.bgp_lan_subnets
+    google_compute_subnetwork.bgp_lan_subnets,
+    data.google_compute_network.existing_bgp_lan_vpcs,
+    data.google_compute_subnetwork.existing_bgp_lan_subnets
   ]
 }
 
@@ -626,7 +682,6 @@ module "pan_fw" {
 
   project = each.value.project_id
   zone    = each.value.zone
-  region  = each.value.region
 
   name         = each.key
   custom_image = "${each.value.firewall_image}-${each.value.firewall_image_version}"
@@ -707,14 +762,14 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-pri"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_pri[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -723,6 +778,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
     module.mc_transit
   ]
@@ -738,14 +794,14 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-ha"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -754,6 +810,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
     module.mc_transit
   ]
@@ -769,14 +826,14 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-pri-to-ha"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_ha[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -785,6 +842,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
     module.mc_transit
   ]
@@ -800,14 +858,14 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
         subnet       = subnet
         intf_type    = intf_type
         aviatrix_asn = transit.aviatrix_gw_asn
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
   name                      = "${each.value.gw_name}-bgp-lan-${each.value.intf_type}-peer-ha-to-pri"
   project                   = each.value.project_id
   region                    = each.value.region
-  router                    = google_compute_router.bgp_lan_routers[each.key].name
+  router                    = local.bgp_lan_routers[each.key].name
   interface                 = google_compute_router_interface.bgp_lan_interfaces_pri[each.key].name
   peer_ip_address           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   peer_asn                  = each.value.aviatrix_asn
@@ -816,6 +874,7 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
 
   depends_on = [
     google_compute_router.bgp_lan_routers,
+    data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
     module.mc_transit
   ]
@@ -831,7 +890,7 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
         subnet                      = subnet
         intf_type                   = intf_type
         manual_bgp_advertised_cidrs = transit.manual_bgp_advertised_cidrs
-      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
   vpc_id                    = module.mc_transit[each.value.gw_name].transit_gateway.vpc_id
@@ -841,11 +900,11 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   tunnel_protocol           = "LAN"
   bgp_local_as_num          = [for t in var.transits : t.aviatrix_gw_asn if t.gw_name == each.value.gw_name][0]
   bgp_remote_as_num         = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
-  remote_lan_ip             = google_compute_address.bgp_lan_addresses["${each.key}-pri"].address
+  remote_lan_ip             = local.bgp_lan_addresses["${each.key}-pri"].address
   local_lan_ip              = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   ha_enabled                = true
   backup_bgp_remote_as_num  = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
-  backup_remote_lan_ip      = google_compute_address.bgp_lan_addresses["${each.key}-ha"].address
+  backup_remote_lan_ip      = local.bgp_lan_addresses["${each.key}-ha"].address
   backup_local_lan_ip       = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   enable_bgp_lan_activemesh = true
 
@@ -853,7 +912,48 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
 
   depends_on = [
     module.mc_transit,
-    google_compute_address.bgp_lan_addresses
+    google_compute_address.bgp_lan_addresses,
+    data.google_compute_address.existing_bgp_lan_addresses
+  ]
+}
+
+resource "aviatrix_transit_external_device_conn" "external_device" {
+  for_each                  = local.external_device_pairs
+  vpc_id                    = module.mc_transit[each.value.transit_gw_name].transit_gateway.vpc_id
+  connection_name           = each.value.connection_name
+  gw_name                   = each.value.transit_gw_name
+  remote_gateway_ip         = each.value.remote_gateway_ip
+  backup_remote_gateway_ip  = each.value.ha_enabled ? each.value.backup_remote_gateway_ip : null
+  backup_bgp_remote_as_num  = each.value.ha_enabled ? each.value.bgp_remote_asn : null
+  connection_type           = each.value.bgp_enabled ? "bgp" : "static"
+  bgp_local_as_num          = each.value.bgp_enabled ? module.mc_transit[each.value.transit_gw_name].transit_gateway.local_as_number : null
+  bgp_remote_as_num         = each.value.bgp_enabled ? each.value.bgp_remote_asn : null
+  tunnel_protocol           = "IPsec"
+  direct_connect            = false
+  ha_enabled                = each.value.ha_enabled
+  local_tunnel_cidr         = each.value.local_tunnel_cidr
+  remote_tunnel_cidr        = each.value.remote_tunnel_cidr
+  backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
+  backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
+  enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
+  # Custom IPsec algorithm support - only set when custom_algorithms is true
+  custom_algorithms         = each.value.custom_algorithms
+  pre_shared_key            = each.value.pre_shared_key
+  backup_pre_shared_key     = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
+  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
+  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
+  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
+  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
+  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
+  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
+  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
+  # BGP learned CIDRs and manual advertisement support - only set when bgp_enabled is true
+  enable_learned_cidrs_approval = each.value.bgp_enabled ? each.value.enable_learned_cidrs_approval : null
+  approved_cidrs                = each.value.bgp_enabled && each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
+  manual_bgp_advertised_cidrs   = each.value.bgp_enabled ? each.value.manual_bgp_advertised_cidrs : null
+
+  depends_on = [
+    module.mc_transit
   ]
 }
 

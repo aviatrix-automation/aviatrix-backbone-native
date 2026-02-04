@@ -24,7 +24,10 @@ variable "transits" {
     access_account_name         = string
     cloud_router_asn            = number
     aviatrix_gw_asn             = number
-    bgp_lan_subnets             = map(string)
+    bgp_lan_subnets             = map(object({
+      cidr                 = string           # CIDR for new subnet or validation for existing
+      existing_subnet_name = optional(string) # Name of existing subnet (when NCC hub create = false)
+    }))
     fw_amount                   = optional(number, 0)
     fw_instance_size            = optional(string, "n2-standard-4")
     firewall_image              = optional(string, "")
@@ -57,10 +60,10 @@ variable "transits" {
   validation {
     condition = alltrue([
       for t in var.transits : alltrue([
-        for s in values(t.bgp_lan_subnets) : s == "" || can(cidrhost(s, 1))
+        for s in values(t.bgp_lan_subnets) : s.cidr == "" || can(cidrhost(s.cidr, 1))
       ])
     ])
-    error_message = "All non-empty BGP LAN subnets must be valid CIDR ranges."
+    error_message = "All non-empty BGP LAN subnet CIDRs must be valid CIDR ranges."
   }
   validation {
     condition = alltrue([
@@ -149,11 +152,14 @@ variable "aviatrix_spokes" {
 }
 
 variable "ncc_hubs" {
-  description = "List of NCC hubs to create"
+  description = "List of NCC hubs to create or use existing"
   type = list(object({
     name            = string
     create          = optional(bool, true)
     preset_topology = optional(string, "STAR")
+    # For existing VPC (when create = false)
+    existing_vpc_name    = optional(string)
+    existing_vpc_project = optional(string)  # Defaults to project_id if not specified
   }))
   default = []
 
@@ -162,6 +168,14 @@ variable "ncc_hubs" {
       for hub in var.ncc_hubs : contains(["STAR", "MESH"], hub.preset_topology)
     ])
     error_message = "Each hub's preset_topology must be 'STAR' or 'MESH'."
+  }
+
+  validation {
+    condition = alltrue([
+      for hub in var.ncc_hubs :
+      hub.create || (hub.existing_vpc_name != null && hub.existing_vpc_name != "")
+    ])
+    error_message = "When create = false, existing_vpc_name must be provided."
   }
 }
 
@@ -184,6 +198,7 @@ variable "external_devices" {
     # Custom IPsec algorithm parameters
     custom_algorithms         = optional(bool, false)
     pre_shared_key            = optional(string)
+    backup_pre_shared_key     = optional(string)
     phase_1_authentication    = optional(string)
     phase_1_dh_groups         = optional(string)
     phase_1_encryption        = optional(string)
@@ -191,6 +206,10 @@ variable "external_devices" {
     phase_2_dh_groups         = optional(string)
     phase_2_encryption        = optional(string)
     phase1_local_identifier   = optional(string)
+    # BGP learned CIDRs and manual advertisement parameters
+    enable_learned_cidrs_approval = optional(bool, false)
+    approved_cidrs                = optional(set(string))
+    manual_bgp_advertised_cidrs   = optional(list(string))
   }))
   default = {}
 }
