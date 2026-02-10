@@ -1,16 +1,16 @@
 output "debug_filtered_connections" {
   description = "Debug: filtered Site2Cloud connections used for segmentation associations"
-  value = local.filtered_connections
+  value       = local.filtered_connections
 }
 
 output "debug_domain_attachment_pairs" {
   description = "Debug: all domain_attachment_pairs generated for segmentation associations"
-  value = local.domain_attachment_pairs
+  value       = local.domain_attachment_pairs
 }
 
 output "debug_connections_list" {
   description = "Debug: raw Site2Cloud connections list from API"
-  value = local.connections_list
+  value       = local.connections_list
 }
 
 output "network_domains_pretty" {
