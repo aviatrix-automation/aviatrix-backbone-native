@@ -39,8 +39,10 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-# Claude Code documentation
+# Claude Code documentation (anywhere in repo)
+**/CLAUDE.md
 CLAUDE.md
+**/.claude/
 
-# Cursor IDE configuration
-.cursor/
+# Cursor IDE configuration (anywhere in repo)
+**/.cursor/
