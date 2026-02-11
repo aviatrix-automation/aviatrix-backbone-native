@@ -28,18 +28,18 @@ locals {
   # Cloud types: 1=AWS, 4=GCP, 8=Azure
   # HPE/Insane mode over internet supported among AWS, GCP, and Azure
   # Max performance supported for same-cloud: AWS (1), GCP (4), Azure (8)
-  hpe_over_internet_cloud_types = [1, 4, 8]  # AWS, GCP, and Azure
-  max_performance_cloud_types   = [1, 4, 8]  # AWS, GCP, and Azure
+  hpe_over_internet_cloud_types = [1, 4, 8] # AWS, GCP, and Azure
+  max_performance_cloud_types   = [1, 4, 8] # AWS, GCP, and Azure
 
   # Generate same-cloud peering pairs (full mesh within each cloud type)
   same_cloud_peering_pairs = flatten([
     for cloud_type, gateways in local.same_cloud_peering : [
       for i, gw1 in gateways : [
         for j, gw2 in gateways : {
-          key                   = "${gw1}:${gw2}"
-          gateway_1             = gw1
-          gateway_2             = gw2
-          cloud_type            = cloud_type
+          key                       = "${gw1}:${gw2}"
+          gateway_1                 = gw1
+          gateway_2                 = gw2
+          cloud_type                = cloud_type
           max_performance_supported = contains(local.max_performance_cloud_types, cloud_type)
         } if i < j
       ]
@@ -83,6 +83,8 @@ resource "aviatrix_transit_gateway_peering" "same_cloud" {
 }
 
 # Cross-cloud peering
+# Note: Cross-cloud peering with HPE (15 tunnels) can take 5-10 minutes
+# If you encounter timeout errors, see README.md Troubleshooting section
 resource "aviatrix_transit_gateway_peering" "cross_cloud" {
   for_each = local.cross_cloud_peering_map
 

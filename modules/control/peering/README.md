@@ -138,3 +138,50 @@ module "peering" {
 - Does NOT use `enable_max_performance` (same-cloud only parameter)
 
 **Important:** Separate configurations allow different settings for same-cloud vs cross-cloud peering scenarios based on Aviatrix platform capabilities.
+
+## Troubleshooting
+
+### Timeout Errors on Cross-Cloud Peering
+
+Cross-cloud peering operations (especially with 15 tunnels) can take longer than the default timeouts. If you encounter errors like:
+
+```
+Error: failed to create Aviatrix Transit Gateway peering: HTTP POST "https://controller/v2/api" failed: context deadline exceeded
+```
+
+**Solutions:**
+
+1. **Retry the operation** - Simply run `terraform apply` again:
+   ```bash
+   terraform apply
+   ```
+   Often the peering is partially created and will complete on retry.
+
+2. **Increase Go HTTP client timeout** - Set environment variable before running Terraform:
+   ```bash
+   export TF_HTTP_TIMEOUT=600  # 10 minutes
+   terraform apply
+   ```
+
+3. **Apply with parallelism=1** - Reduce concurrent operations to avoid controller overload:
+   ```bash
+   terraform apply -parallelism=1
+   ```
+
+4. **Target specific peerings** - Apply cross-cloud peerings one at a time:
+   ```bash
+   # List peerings
+   terraform state list | grep cross_cloud
+
+   # Apply one at a time
+   terraform apply -target='aviatrix_transit_gateway_peering.cross_cloud["aws-tr-prod-1:az-eaus2-transit"]'
+   ```
+
+5. **Check controller performance** - Ensure the Aviatrix controller has adequate resources and isn't overloaded with other operations.
+
+**Expected Duration:**
+- Same-cloud peering: 1-2 minutes
+- Cross-cloud peering (no HPE): 2-3 minutes
+- Cross-cloud peering (HPE with 15 tunnels): 5-10 minutes
+
+**Note:** Timeout errors don't necessarily mean failure. Check the controller UI to verify if the peering was successfully created before retrying.
