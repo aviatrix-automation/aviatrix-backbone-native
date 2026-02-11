@@ -37,6 +37,7 @@ variable "transits" {
     mgmt_cidr                   = optional(string, "")
     egress_cidr                 = optional(string, "")
     manual_bgp_advertised_cidrs = optional(set(string), [])
+    bgp_lan_connection_cidrs    = optional(map(set(string)), {})
     inspection_enabled          = optional(bool, false)
     egress_enabled              = optional(bool, true)
     zone                        = optional(string, "")

@@ -18,12 +18,13 @@ variable "region" {
 
 variable "transits" {
   description = "Map of transit gateway configurations."
-  type        = map(object({
+  type = map(object({
     account                     = string
     cidr                        = string
     instance_size               = string
     local_as_number             = number
     manual_bgp_advertised_cidrs = optional(set(string), [])
+    tgw_connection_cidrs        = optional(map(set(string)), {})
     fw_amount                   = optional(number, 0)
     fw_instance_size            = optional(string, "c5.xlarge")
     firewall_image              = optional(string, "")
@@ -38,7 +39,7 @@ variable "transits" {
     egress_source_ranges        = optional(set(string), ["0.0.0.0/0"])
     lan_source_ranges           = optional(set(string), ["0.0.0.0/0"])
     # Learned CIDRs approval configuration
-    learned_cidr_approval      = optional(string, "false")
+    learned_cidr_approval       = optional(string, "false")
     learned_cidrs_approval_mode = optional(string, null)
     approved_learned_cidrs      = optional(list(string), null)
     inside_cidr_blocks = optional(map(object({
@@ -65,7 +66,7 @@ variable "transits" {
 
 variable "tgws" {
   description = "Map of AWS Transit Gateway configurations."
-  type        = map(object({
+  type = map(object({
     amazon_side_asn             = optional(number)
     transit_gateway_cidr_blocks = optional(list(string), [])
     create_tgw                  = bool
@@ -76,7 +77,7 @@ variable "tgws" {
 
 variable "external_devices" {
   description = "Map of external devices to connect to Aviatrix Transit Gateways."
-  type        = map(object({
+  type = map(object({
     transit_key               = string
     connection_name           = string
     remote_gateway_ip         = string
@@ -91,28 +92,28 @@ variable "external_devices" {
     enable_ikev2              = optional(bool)
     inspected_by_firenet      = bool
     # Custom IPsec algorithm parameters
-    custom_algorithms         = optional(bool, false)
-    pre_shared_key            = optional(string)
-    backup_pre_shared_key     = optional(string)
-    phase_1_authentication    = optional(string)
-    phase_1_dh_groups         = optional(string)
-    phase_1_encryption        = optional(string)
-    phase_2_authentication    = optional(string)
-    phase_2_dh_groups         = optional(string)
-    phase_2_encryption        = optional(string)
-    phase1_local_identifier   = optional(string)
+    custom_algorithms       = optional(bool, false)
+    pre_shared_key          = optional(string)
+    backup_pre_shared_key   = optional(string)
+    phase_1_authentication  = optional(string)
+    phase_1_dh_groups       = optional(string)
+    phase_1_encryption      = optional(string)
+    phase_2_authentication  = optional(string)
+    phase_2_dh_groups       = optional(string)
+    phase_2_encryption      = optional(string)
+    phase1_local_identifier = optional(string)
     # BGP learned CIDRs and manual advertisement parameters
     enable_learned_cidrs_approval = optional(bool, false)
     approved_cidrs                = optional(set(string))
     manual_bgp_advertised_cidrs   = optional(list(string))
-    disable_activemesh        = optional(bool, false)
+    disable_activemesh            = optional(bool, false)
   }))
   default = {}
 }
 
 variable "spokes" {
   description = "Map of spoke configurations keyed by the spoke name."
-  type        = map(object({
+  type = map(object({
     account                          = string
     attached                         = bool
     cidr                             = string

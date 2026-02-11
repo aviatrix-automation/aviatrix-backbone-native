@@ -889,7 +889,7 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
         region                      = transit.region
         subnet                      = subnet
         intf_type                   = intf_type
-        manual_bgp_advertised_cidrs = transit.manual_bgp_advertised_cidrs
+        manual_bgp_advertised_cidrs = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
       } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }

@@ -1,0 +1,257 @@
+# ============================================================================
+# AWS Transit Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the AWS transit module.
+# Copy to terraform.tfvars and customize for your environment.
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssm_region = "us-east-1"
+
+# AWS region for resource deployment
+region = "us-east-1"
+
+# ----------------------------------------------------------------------------
+# Tags (Optional)
+# ----------------------------------------------------------------------------
+
+tags = {
+  Environment = "production"
+  ManagedBy   = "terraform"
+  Owner       = "network-team"
+}
+
+# ----------------------------------------------------------------------------
+# Transit Gateways
+# ----------------------------------------------------------------------------
+
+transits = {
+  "us-east-1-transit" = {
+    account         = "aws-prod"
+    cidr            = "10.1.0.0/16"
+    instance_size   = "c5.xlarge"
+    local_as_number = 64512
+
+    # ========================================================================
+    # BGP Route Advertisement Configuration
+    # ========================================================================
+
+    # Transit-wide default (applies to all TGW connections unless overridden)
+    manual_bgp_advertised_cidrs = ["10.0.0.0/8", "172.16.0.0/12"]
+
+    # Per-TGW BGP advertisement overrides (NEW FEATURE)
+    # Maps TGW name to specific CIDRs to advertise
+    # - If specified, overrides transit-wide setting for that TGW
+    # - All 8 GRE connections to that TGW will advertise these CIDRs
+    # - If not specified for a TGW, uses manual_bgp_advertised_cidrs
+    tgw_connection_cidrs = {
+      "tgw-prod-east" = ["10.1.0.0/16", "10.2.0.0/16"]
+      "tgw-prod-west" = ["10.3.0.0/16"]
+      # TGWs not listed here will use manual_bgp_advertised_cidrs
+    }
+
+    # ========================================================================
+    # TGW Integration (Optional)
+    # ========================================================================
+
+    # Comma-separated list of TGW names (from tgws variable)
+    tgw_name = "tgw-prod-east,tgw-prod-west"
+
+    # Inside CIDR blocks for TGW Connect peers (8 peers per TGW)
+    # Required when tgw_name is specified
+    inside_cidr_blocks = {
+      "tgw-prod-east" = {
+        connect_peer_1    = "169.254.101.0/29"
+        ha_connect_peer_1 = "169.254.201.0/29"
+        connect_peer_2    = "169.254.102.0/29"
+        ha_connect_peer_2 = "169.254.202.0/29"
+        connect_peer_3    = "169.254.103.0/29"
+        ha_connect_peer_3 = "169.254.203.0/29"
+        connect_peer_4    = "169.254.104.0/29"
+        ha_connect_peer_4 = "169.254.204.0/29"
+        connect_peer_5    = "169.254.105.0/29"
+        ha_connect_peer_5 = "169.254.205.0/29"
+        connect_peer_6    = "169.254.106.0/29"
+        ha_connect_peer_6 = "169.254.206.0/29"
+        connect_peer_7    = "169.254.107.0/29"
+        ha_connect_peer_7 = "169.254.207.0/29"
+        connect_peer_8    = "169.254.108.0/29"
+        ha_connect_peer_8 = "169.254.208.0/29"
+      }
+      "tgw-prod-west" = {
+        connect_peer_1    = "169.254.111.0/29"
+        ha_connect_peer_1 = "169.254.211.0/29"
+        connect_peer_2    = "169.254.112.0/29"
+        ha_connect_peer_2 = "169.254.212.0/29"
+        connect_peer_3    = "169.254.113.0/29"
+        ha_connect_peer_3 = "169.254.213.0/29"
+        connect_peer_4    = "169.254.114.0/29"
+        ha_connect_peer_4 = "169.254.214.0/29"
+        connect_peer_5    = "169.254.115.0/29"
+        ha_connect_peer_5 = "169.254.215.0/29"
+        connect_peer_6    = "169.254.116.0/29"
+        ha_connect_peer_6 = "169.254.216.0/29"
+        connect_peer_7    = "169.254.117.0/29"
+        ha_connect_peer_7 = "169.254.217.0/29"
+        connect_peer_8    = "169.254.118.0/29"
+        ha_connect_peer_8 = "169.254.218.0/29"
+      }
+    }
+
+    # ========================================================================
+    # FireNet / Firewall Configuration (Optional)
+    # ========================================================================
+
+    fw_amount              = 2
+    fw_instance_size       = "c5.xlarge"
+    firewall_image         = "Palo Alto Networks VM-Series Next-Generation Firewall (BYOL)"
+    firewall_image_version = "10.2.3"
+    attach_firewall        = true
+    inspection_enabled     = true
+    egress_enabled         = true
+
+    # Firewall bootstrap bucket
+    bootstrap_bucket_name_1 = "my-fw-bootstrap-bucket"
+
+    # SSH key for firewall management
+    ssh_keys = "admin:ssh-rsa AAAAB3Nza..."
+
+    # Firewall security group source ranges
+    mgmt_source_ranges   = ["10.0.0.0/8"]
+    egress_source_ranges = ["0.0.0.0/0"]
+    lan_source_ranges    = ["10.0.0.0/8"]
+
+    # ========================================================================
+    # BGP Learned CIDRs Configuration (Optional)
+    # ========================================================================
+
+    learned_cidr_approval       = "false"
+    learned_cidrs_approval_mode = null
+    approved_learned_cidrs      = null
+  }
+
+  "us-west-2-transit" = {
+    account         = "aws-prod"
+    cidr            = "10.2.0.0/16"
+    instance_size   = "c5.xlarge"
+    local_as_number = 64513
+
+    # Simple configuration without TGW
+    manual_bgp_advertised_cidrs = ["10.0.0.0/8"]
+
+    # No firewall
+    fw_amount = 0
+  }
+}
+
+# ----------------------------------------------------------------------------
+# AWS Transit Gateways (Optional)
+# ----------------------------------------------------------------------------
+
+tgws = {
+  "tgw-prod-east" = {
+    amazon_side_asn             = 64512
+    transit_gateway_cidr_blocks = []
+    create_tgw                  = true
+    account_ids                 = ["123456789012", "234567890123"]
+  }
+
+  "tgw-prod-west" = {
+    amazon_side_asn             = 64513
+    transit_gateway_cidr_blocks = []
+    create_tgw                  = true
+    account_ids                 = ["123456789012"]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# External Devices (IPSec Connections) (Optional)
+# ----------------------------------------------------------------------------
+
+external_devices = {
+  "datacenter-1" = {
+    transit_key        = "us-east-1-transit"
+    connection_name    = "datacenter-primary"
+    remote_gateway_ip  = "203.0.113.10"
+    bgp_enabled        = true
+    bgp_remote_asn     = "65001"
+    local_tunnel_cidr  = "169.254.10.0/30"
+    remote_tunnel_cidr = "169.254.10.0/30"
+
+    # HA configuration
+    ha_enabled                = true
+    backup_remote_gateway_ip  = "203.0.113.20"
+    backup_local_tunnel_cidr  = "169.254.11.0/30"
+    backup_remote_tunnel_cidr = "169.254.11.0/30"
+
+    # IPSec configuration
+    enable_ikev2          = true
+    inspected_by_firenet  = true
+    custom_algorithms     = false
+    pre_shared_key        = "my-secure-psk"
+    backup_pre_shared_key = "my-secure-backup-psk"
+
+    # Per-connection BGP advertisements (already supported)
+    enable_learned_cidrs_approval = false
+    approved_cidrs                = []
+    manual_bgp_advertised_cidrs   = ["10.1.0.0/16", "10.2.0.0/16"]
+
+    disable_activemesh = false
+  }
+
+  "partner-network" = {
+    transit_key          = "us-west-2-transit"
+    connection_name      = "partner-vpn"
+    remote_gateway_ip    = "198.51.100.50"
+    bgp_enabled          = true
+    bgp_remote_asn       = "65002"
+    local_tunnel_cidr    = "169.254.20.0/30"
+    remote_tunnel_cidr   = "169.254.20.0/30"
+    ha_enabled           = false
+    enable_ikev2         = true
+    inspected_by_firenet = false
+    custom_algorithms    = false
+
+    # Different BGP advertisements for this connection
+    manual_bgp_advertised_cidrs = ["10.2.0.0/16"]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Spoke Gateways (Optional)
+# ----------------------------------------------------------------------------
+
+spokes = {
+  "spoke-app-1" = {
+    account                          = "aws-prod"
+    attached                         = true
+    cidr                             = "10.10.0.0/16"
+    customized_spoke_vpc_routes      = ""
+    included_advertised_spoke_routes = ""
+    insane_mode                      = true
+    enable_max_performance           = false
+    spoke_instance_size              = "t3.large"
+    enable_bgp                       = false
+    local_as_number                  = null
+    allocate_new_eip                 = true
+    eip                              = null
+    ha_eip                           = null
+    use_existing_vpc                 = false
+    vpc_id                           = null
+    gw_subnet                        = null
+    hagw_subnet                      = null
+    single_ip_snat                   = false
+    transit_key                      = "us-east-1-transit"
+  }
+
+  "spoke-db-1" = {
+    account     = "aws-prod"
+    attached    = true
+    cidr        = "10.20.0.0/16"
+    insane_mode = true
+    transit_key = "us-east-1-transit"
+  }
+}

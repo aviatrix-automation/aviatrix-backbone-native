@@ -1,0 +1,268 @@
+# ============================================================================
+# GCP Transit Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the GCP transit module.
+# Copy to terraform.tfvars and customize for your environment.
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssm_region = "us-east-1"
+
+# GCP project ID for NCC hubs and Palo Alto Network bootstrap storage buckets
+project_id = "my-gcp-project"
+
+# ----------------------------------------------------------------------------
+# NCC Hubs
+# ----------------------------------------------------------------------------
+
+ncc_hubs = [
+  {
+    name            = "hub-us-east"
+    create          = true
+    preset_topology = "MESH"
+  },
+  {
+    name            = "hub-us-west"
+    create          = true
+    preset_topology = "MESH"
+  },
+  {
+    # Using existing VPC for NCC hub
+    name                 = "hub-europe"
+    create               = false
+    existing_vpc_name    = "existing-hub-vpc"
+    existing_vpc_project = "my-gcp-project"  # Optional, defaults to project_id
+    preset_topology      = "STAR"
+  }
+]
+
+# ----------------------------------------------------------------------------
+# Transit Gateways
+# ----------------------------------------------------------------------------
+
+transits = [
+  {
+    gw_name             = "gcp-us-central-transit"
+    project_id          = "my-gcp-project"
+    region              = "us-central1"
+    zone                = "us-central1-a"
+    ha_zone             = "us-central1-b"
+    name                = "transit-1"
+    vpc_cidr            = "10.10.0.0/16"
+    lan_cidr            = "10.10.1.0/24"
+    mgmt_cidr           = "10.10.2.0/24"
+    egress_cidr         = "10.10.3.0/24"
+    gw_size             = "n2-highcpu-8"
+    access_account_name = "gcp-prod"
+
+    # BGP ASN configuration
+    cloud_router_asn = 64515
+    aviatrix_gw_asn  = 64516
+
+    # ========================================================================
+    # BGP LAN Subnets (for NCC Hub Connections)
+    # ========================================================================
+    # Each entry creates a BGP-over-LAN connection to an NCC hub
+    # Keys must match NCC hub names defined above
+    bgp_lan_subnets = {
+      "hub-us-east" = {
+        cidr = "192.168.1.0/29"  # New subnet for BGP LAN
+      }
+      "hub-us-west" = {
+        cidr = "192.168.2.0/29"  # New subnet for BGP LAN
+      }
+      "hub-europe" = {
+        cidr                 = "192.168.3.0/29"
+        existing_subnet_name = "existing-bgp-subnet"  # For existing VPC
+      }
+    }
+
+    # ========================================================================
+    # BGP Route Advertisement Configuration
+    # ========================================================================
+
+    # Transit-wide default (applies to all BGP-LAN connections unless overridden)
+    manual_bgp_advertised_cidrs = ["10.0.0.0/8", "172.16.0.0/12"]
+
+    # Per-hub BGP advertisement overrides (NEW FEATURE)
+    # Maps NCC hub name to specific CIDRs to advertise
+    # - If specified, overrides transit-wide setting for that hub
+    # - If not specified for a hub, uses manual_bgp_advertised_cidrs
+    bgp_lan_connection_cidrs = {
+      "hub-us-east" = ["10.10.0.0/16", "10.20.0.0/16"]
+      "hub-us-west" = ["10.10.0.0/16"]
+      # hub-europe not listed, will use manual_bgp_advertised_cidrs
+    }
+
+    # ========================================================================
+    # FireNet / Firewall Configuration (Optional)
+    # ========================================================================
+
+    fw_amount              = 2
+    fw_instance_size       = "n2-standard-4"
+    firewall_image         = "vmseries-flex-byol"
+    firewall_image_version = "10.2.3"
+    attach_firewall        = true
+    inspection_enabled     = true
+    egress_enabled         = true
+
+    # SSH key for firewall management
+    ssh_keys = "admin:ssh-rsa AAAAB3Nza..."
+
+    # Firewall security group source ranges
+    source_ranges = ["10.0.0.0/8"]
+
+    # Service account for firewall instances
+    service_account = "firewall-sa@my-gcp-project.iam.gserviceaccount.com"
+
+    # Bootstrap configuration
+    name_prefix = "paloaltonetworks-firewall-bootstrap-"
+    files = {
+      "bootstrap/init-cfg.txt"  = "config/init-cfg.txt"
+      "bootstrap/bootstrap.xml" = "config/bootstrap.xml"
+    }
+
+    # ========================================================================
+    # BGP Learned CIDRs Configuration (Optional)
+    # ========================================================================
+
+    learned_cidr_approval       = "false"
+    learned_cidrs_approval_mode = null
+    approved_learned_cidrs      = null
+  },
+
+  {
+    # Simple transit without firewall
+    gw_name             = "gcp-europe-transit"
+    project_id          = "my-gcp-project"
+    region              = "europe-west1"
+    zone                = "europe-west1-b"
+    ha_zone             = "europe-west1-c"
+    name                = "transit-2"
+    vpc_cidr            = "10.20.0.0/16"
+    lan_cidr            = "10.20.1.0/24"
+    gw_size             = "n2-highcpu-8"
+    access_account_name = "gcp-prod"
+
+    cloud_router_asn = 64517
+    aviatrix_gw_asn  = 64518
+
+    bgp_lan_subnets = {
+      "hub-europe" = {
+        cidr = "192.168.10.0/29"
+      }
+    }
+
+    # Single CIDR for all connections
+    manual_bgp_advertised_cidrs = ["10.20.0.0/16"]
+
+    # No firewall
+    fw_amount = 0
+  }
+]
+
+# ----------------------------------------------------------------------------
+# External Devices (IPSec Connections) (Optional)
+# ----------------------------------------------------------------------------
+
+external_devices = {
+  "datacenter-1" = {
+    transit_gw_name    = "gcp-us-central-transit"
+    connection_name    = "datacenter-primary"
+    remote_gateway_ip  = "203.0.113.10"
+    bgp_enabled        = true
+    bgp_remote_asn     = "65001"
+    local_tunnel_cidr  = "169.254.10.0/30"
+    remote_tunnel_cidr = "169.254.10.0/30"
+
+    # HA configuration
+    ha_enabled                = true
+    backup_remote_gateway_ip  = "203.0.113.20"
+    backup_local_tunnel_cidr  = "169.254.11.0/30"
+    backup_remote_tunnel_cidr = "169.254.11.0/30"
+
+    # IPSec configuration
+    enable_ikev2          = true
+    inspected_by_firenet  = true
+    custom_algorithms     = false
+    pre_shared_key        = "my-secure-psk"
+    backup_pre_shared_key = "my-secure-backup-psk"
+
+    # Per-connection BGP advertisements (already supported)
+    enable_learned_cidrs_approval = false
+    approved_cidrs                = []
+    manual_bgp_advertised_cidrs   = ["10.10.0.0/16"]
+  }
+
+  "partner-network" = {
+    transit_gw_name    = "gcp-europe-transit"
+    connection_name    = "partner-vpn"
+    remote_gateway_ip  = "198.51.100.50"
+    bgp_enabled        = true
+    bgp_remote_asn     = "65002"
+    local_tunnel_cidr  = "169.254.20.0/30"
+    remote_tunnel_cidr = "169.254.20.0/30"
+    ha_enabled         = false
+    enable_ikev2       = true
+    inspected_by_firenet = false
+    custom_algorithms  = false
+
+    # Different BGP advertisements for this connection
+    manual_bgp_advertised_cidrs = ["10.20.0.0/16"]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# GCP Native Spokes (Optional)
+# ----------------------------------------------------------------------------
+# Connects existing GCP VPCs to NCC hubs as spokes
+
+spokes = [
+  {
+    vpc_name   = "app-vpc-1"
+    project_id = "my-gcp-project"
+    ncc_hub    = "hub-us-east"
+  },
+  {
+    vpc_name   = "db-vpc-1"
+    project_id = "my-gcp-project"
+    ncc_hub    = "hub-us-east"
+  }
+]
+
+# ----------------------------------------------------------------------------
+# Aviatrix Spoke Gateways (Optional)
+# ----------------------------------------------------------------------------
+# Creates Aviatrix-managed spoke gateways
+# Note: BGP is NOT supported for GCP spoke gateways
+
+aviatrix_spokes = {
+  "spoke-app-1" = {
+    account                          = "gcp-prod"
+    region                           = "us-central1"
+    attached                         = true
+    cidr                             = "10.100.0.0/16"
+    customized_spoke_vpc_routes      = ""
+    included_advertised_spoke_routes = ""
+    insane_mode                      = true
+    enable_max_performance           = false
+    spoke_instance_size              = "n1-standard-1"
+    allocate_new_eip                 = false
+    eip                              = null
+    ha_eip                           = null
+    single_ip_snat                   = false
+    transit_gw_name                  = "gcp-us-central-transit"
+  }
+
+  "spoke-db-1" = {
+    account         = "gcp-prod"
+    region          = "us-central1"
+    attached        = true
+    cidr            = "10.110.0.0/16"
+    insane_mode     = true
+    transit_gw_name = "gcp-us-central-transit"
+  }
+}
