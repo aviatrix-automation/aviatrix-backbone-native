@@ -35,20 +35,49 @@ locals {
   domain_attachment_pairs = distinct(flatten([
     for conn in local.filtered_connections : [
       for gw_name in split(",", replace(conn.gw_name, " ", "")) :
-        {
-          key                = "${local.inferred_domains[conn.name]}~${conn.name}~${gw_name}"
-          network_domain     = local.inferred_domains[conn.name]
-          attachment_name    = conn.name
-          transit_gateway    = gw_name
-        }
+      {
+        key             = "${local.inferred_domains[conn.name]}~${conn.name}~${gw_name}"
+        network_domain  = local.inferred_domains[conn.name]
+        attachment_name = conn.name
+        transit_gateway = gw_name
+      }
       if local.inferred_domains[conn.name] != ""
-         && contains(local.defined_domains, local.inferred_domains[conn.name])
-         && !endswith(gw_name, "-hagw")
-         && contains(conn.gateway_list, gw_name)
+      && contains(local.defined_domains, local.inferred_domains[conn.name])
+      && !endswith(gw_name, "-hagw")
+      && contains(conn.gateway_list, gw_name)
+      && !contains(var.exclude_connections, conn.name)
     ]
   ]))
 
-  association_map = { for pair in local.domain_attachment_pairs : pair.key => pair }
+  # Auto-inferred transit associations as simple map
+  auto_transit_associations = {
+    for pair in local.domain_attachment_pairs :
+    "${pair.attachment_name}~${pair.transit_gateway}" => pair
+  }
+
+  # Parse manual transit associations into full structure
+  manual_transit_associations_parsed = {
+    for key, domain in var.manual_transit_associations :
+    key => {
+      key             = "${domain}~${key}"
+      network_domain  = domain
+      attachment_name = split("~", key)[0]
+      transit_gateway = split("~", key)[1]
+    }
+    if contains(local.defined_domains, domain) && length(split("~", key)) == 2
+  }
+
+  # Merge: manual takes precedence over auto-inferred
+  merged_transit_associations = merge(
+    local.auto_transit_associations,
+    local.manual_transit_associations_parsed
+  )
+
+  # Final association map for resource creation
+  association_map = {
+    for key, assoc in local.merged_transit_associations :
+    "${assoc.network_domain}~${assoc.attachment_name}~${assoc.transit_gateway}" => assoc
+  }
 
   spoke_inferred_domains = {
     for gw in data.aviatrix_spoke_gateways.all_spoke_gws.gateway_list :
@@ -63,7 +92,9 @@ locals {
       ][0],
       ""
     )
-    if gw.cloud_type == 8 && !endswith(gw.gw_name, "-hagw")
+    if contains(var.spoke_cloud_types, gw.cloud_type)
+    && !endswith(gw.gw_name, "-hagw")
+    && !contains(var.exclude_spoke_gateways, gw.gw_name)
   }
 
   spoke_associations = flatten([
@@ -76,8 +107,33 @@ locals {
     if lookup(local.spoke_inferred_domains, gw.gw_name, "") != "" && !endswith(transit, "-hagw")]
   ])
 
+  # Auto-inferred spoke associations as simple map
+  auto_spoke_associations = {
+    for assoc in local.spoke_associations :
+    "${assoc.spoke_gateway}~${assoc.transit_gateway}" => assoc
+  }
+
+  # Parse manual spoke associations into full structure
+  manual_spoke_associations_parsed = {
+    for key, domain in var.manual_spoke_associations :
+    key => {
+      spoke_gateway   = split("~", key)[0]
+      transit_gateway = split("~", key)[1]
+      network_domain  = domain
+    }
+    if contains(local.defined_domains, domain) && length(split("~", key)) == 2
+  }
+
+  # Merge: manual takes precedence over auto-inferred
+  merged_spoke_associations = merge(
+    local.auto_spoke_associations,
+    local.manual_spoke_associations_parsed
+  )
+
+  # Final spoke association map for resource creation
   spoke_association_map = {
-    for assoc in local.spoke_associations : "${assoc.network_domain}~${assoc.spoke_gateway}~${assoc.transit_gateway}" => assoc
+    for key, assoc in local.merged_spoke_associations :
+    "${assoc.network_domain}~${assoc.spoke_gateway}~${assoc.transit_gateway}" => assoc
   }
 
 }
@@ -92,7 +148,7 @@ resource "terracurl_request" "aviatrix_connections" {
   name            = "aviatrix_connections"
   url             = "https://${data.aws_ssm_parameter.aviatrix_ip.value}/v2/api"
   method          = "POST"
-  skip_tls_verify = false
+  skip_tls_verify = true
 
   request_body = jsonencode({
     action = "list_site2cloud"

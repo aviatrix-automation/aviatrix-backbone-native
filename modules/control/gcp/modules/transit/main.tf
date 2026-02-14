@@ -884,12 +884,14 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
-        gw_name                     = transit.gw_name
-        project_id                  = transit.project_id
-        region                      = transit.region
-        subnet                      = subnet
-        intf_type                   = intf_type
-        manual_bgp_advertised_cidrs = transit.manual_bgp_advertised_cidrs
+        gw_name                           = transit.gw_name
+        project_id                        = transit.project_id
+        region                            = transit.region
+        subnet                            = subnet
+        intf_type                         = intf_type
+        manual_bgp_advertised_cidrs       = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
+        enable_learned_cidrs_approval     = try(transit.bgp_lan_connection_learned_cidr_approval[intf_type], false)
+        approved_cidrs                    = try(transit.bgp_lan_connection_approved_cidrs[intf_type], [])
       } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
@@ -905,10 +907,12 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   ha_enabled                = true
   backup_bgp_remote_as_num  = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
   backup_remote_lan_ip      = local.bgp_lan_addresses["${each.key}-ha"].address
-  backup_local_lan_ip       = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
-  enable_bgp_lan_activemesh = true
+  backup_local_lan_ip           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
+  enable_bgp_lan_activemesh     = true
 
-  manual_bgp_advertised_cidrs = each.value.manual_bgp_advertised_cidrs
+  manual_bgp_advertised_cidrs   = each.value.manual_bgp_advertised_cidrs
+  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
+  approved_cidrs                = each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
 
   depends_on = [
     module.mc_transit,
@@ -951,41 +955,6 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   enable_learned_cidrs_approval = each.value.bgp_enabled ? each.value.enable_learned_cidrs_approval : null
   approved_cidrs                = each.value.bgp_enabled && each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
   manual_bgp_advertised_cidrs   = each.value.bgp_enabled ? each.value.manual_bgp_advertised_cidrs : null
-
-  depends_on = [
-    module.mc_transit
-  ]
-}
-
-resource "aviatrix_transit_external_device_conn" "external_device" {
-  for_each                  = local.external_device_pairs
-  vpc_id                    = module.mc_transit[each.value.transit_gw_name].transit_gateway.vpc_id
-  connection_name           = each.value.connection_name
-  gw_name                   = each.value.transit_gw_name
-  remote_gateway_ip         = each.value.remote_gateway_ip
-  backup_remote_gateway_ip  = each.value.ha_enabled ? each.value.backup_remote_gateway_ip : null
-  backup_bgp_remote_as_num  = each.value.ha_enabled ? each.value.bgp_remote_asn : null
-  connection_type           = each.value.bgp_enabled ? "bgp" : "static"
-  bgp_local_as_num          = each.value.bgp_enabled ? module.mc_transit[each.value.transit_gw_name].transit_gateway.local_as_number : null
-  bgp_remote_as_num         = each.value.bgp_enabled ? each.value.bgp_remote_asn : null
-  tunnel_protocol           = "IPsec"
-  direct_connect            = false
-  ha_enabled                = each.value.ha_enabled
-  local_tunnel_cidr         = each.value.local_tunnel_cidr
-  remote_tunnel_cidr        = each.value.remote_tunnel_cidr
-  backup_local_tunnel_cidr  = each.value.ha_enabled ? each.value.backup_local_tunnel_cidr : null
-  backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
-  enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
-  # Custom IPsec algorithm support - only set when custom_algorithms is true
-  custom_algorithms         = each.value.custom_algorithms
-  pre_shared_key            = each.value.custom_algorithms ? each.value.pre_shared_key : null
-  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
-  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
-  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
-  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
-  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
-  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
-  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
 
   depends_on = [
     module.mc_transit

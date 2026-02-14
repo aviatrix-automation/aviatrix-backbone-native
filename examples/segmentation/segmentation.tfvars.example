@@ -1,0 +1,275 @@
+# ============================================================================
+# Network Segmentation Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the segmentation module.
+# Copy this file and customize for your environment.
+#
+# Usage:
+#   terraform -chdir=modules/control/segmentation init
+#   terraform -chdir=modules/control/segmentation plan -var-file=../../segmentation.tfvars
+#   terraform -chdir=modules/control/segmentation apply -var-file=../../segmentation.tfvars
+#
+# IMPORTANT: This module requires a two-stage apply due to for_each dependencies:
+#   Stage 1: terraform apply -target=data.aviatrix_spoke_gateways.all_spoke_gws \
+#                            -target=data.aviatrix_transit_gateways.all_transit_gws \
+#                            -target=terracurl_request.aviatrix_connections
+#   Stage 2: terraform apply
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssw_region = "us-east-1"
+
+# ----------------------------------------------------------------------------
+# Network Domains
+# ----------------------------------------------------------------------------
+
+# List of unique domain names for network segmentation
+# These domains will be used to logically separate traffic
+# Common patterns: environment-based, compliance-based, or function-based
+domains = [
+  "prod",       # Production workloads
+  "non-prod",   # Development and test environments
+  "infra",      # Shared infrastructure services
+  "dmz",        # Internet-facing services
+  "restricted"  # High-security/compliance workloads
+]
+
+# ----------------------------------------------------------------------------
+# Connection Policies
+# ----------------------------------------------------------------------------
+
+# Define which domains can communicate with each other
+# Connections are bidirectional (prod -> infra also allows infra -> prod)
+# By default, domains are isolated unless explicitly connected
+
+connection_policy = [
+  # Production can access shared infrastructure
+  {
+    source = "prod"
+    target = "infra"
+  },
+
+  # Non-prod can access shared infrastructure
+  {
+    source = "non-prod"
+    target = "infra"
+  },
+
+  # DMZ can access production services
+  {
+    source = "dmz"
+    target = "prod"
+  },
+
+  # DMZ can access infrastructure
+  {
+    source = "dmz"
+    target = "infra"
+  },
+
+  # Restricted workloads can only access infrastructure
+  {
+    source = "restricted"
+    target = "infra"
+  }
+]
+
+# ----------------------------------------------------------------------------
+# Spoke Cloud Types (Optional)
+# ----------------------------------------------------------------------------
+
+# List of cloud types to include for spoke gateway associations
+# Default: [8] (Azure only)
+# Cloud types:
+#   1  = AWS
+#   4  = GCP
+#   8  = Azure
+#   16 = OCI
+#   32 = AliCloud
+
+# Example 1: Azure only (default)
+# spoke_cloud_types = [8]
+
+# Example 2: All major clouds
+spoke_cloud_types = [1, 8, 4]
+
+# Example 3: AWS and Azure only
+# spoke_cloud_types = [1, 8]
+
+# ----------------------------------------------------------------------------
+# Auto-Association Naming Conventions
+# ----------------------------------------------------------------------------
+
+# The module automatically associates resources to domains based on naming:
+#
+# Transit Connections (Site2Cloud):
+#   Pattern: "external-{domain}-{description}"
+#   Examples:
+#     - "external-prod-datacenter-primary" → prod domain
+#     - "external-infra-partner-vpn"       → infra domain
+#     - "external-dmz-internet-gateway"    → dmz domain
+#
+# Spoke Gateways:
+#   Pattern: Matches domain name within gateway name
+#   Examples:
+#     - "az-eastus2-prod-spoke-1"    → prod domain
+#     - "aws-west2-non-prod-app"     → non-prod domain
+#     - "gcp-central1-infra-services" → infra domain
+#
+# The module uses longest-match-first algorithm, so "non-prod" is matched
+# before "prod" to avoid incorrect associations.
+
+# ----------------------------------------------------------------------------
+# Manual Transit Associations (Optional)
+# ----------------------------------------------------------------------------
+
+# Manual domain associations for transit connections that don't follow
+# standard naming conventions. These override auto-inference.
+#
+# Format: "connection_name~gateway_name" = "domain_name"
+#
+# IMPORTANT: The key MUST contain exactly one '~' separator
+# Use case: Legacy connections or non-standard naming
+
+manual_transit_associations = {
+  # Legacy VPN connections without standard naming
+  "legacy-vpn-site1~aws-us-east-1-transit"     = "prod"
+  "datacenter-backup~azure-westus2-transit"    = "infra"
+  "partner-vpn-123~gcp-us-central1-transit"    = "dmz"
+
+  # Site2Cloud connections from cloud-native integrations
+  "s2c-aws-tgw-attach~aws-us-west-2-transit"   = "non-prod"
+  "bgp-lan-ncc-hub~gcp-europe-west1-transit"   = "infra"
+}
+
+# ----------------------------------------------------------------------------
+# Manual Spoke Associations (Optional)
+# ----------------------------------------------------------------------------
+
+# Manual domain associations for spoke gateways that don't follow
+# standard naming conventions. These override auto-inference.
+#
+# Format: "spoke_name~transit_name" = "domain_name"
+#
+# IMPORTANT: The key MUST contain exactly one '~' separator
+# Use case: Spoke gateways with non-standard names
+
+manual_spoke_associations = {
+  # Legacy spoke gateways
+  "aws-legacy-app-spoke-1~aws-us-east-1-transit"      = "prod"
+  "azure-backup-services~azure-westus2-transit"       = "non-prod"
+  "gcp-shared-tools~gcp-us-central1-transit"          = "infra"
+
+  # Migrated workloads with old naming
+  "workload-migration-temp~aws-us-west-2-transit"     = "prod"
+  "old-dev-environment~azure-eastus2-transit"         = "non-prod"
+}
+
+# ----------------------------------------------------------------------------
+# Exclusions (Optional)
+# ----------------------------------------------------------------------------
+
+# List of connection names to exclude from auto-association
+# Use case: Test connections, temporary tunnels, or connections that
+# should not be assigned to any domain
+
+exclude_connections = [
+  "external-test-connection-temp",
+  "external-debug-tunnel",
+  "external-sandbox-site2cloud",
+  "external-migration-testing",
+  "test-bgp-peer"
+]
+
+# List of spoke gateway names to exclude from auto-association
+# Use case: Test spokes, development gateways, or temporary infrastructure
+
+exclude_spoke_gateways = [
+  "test-spoke-1",
+  "test-spoke-2",
+  "dev-experimental-spoke",
+  "sandbox-temporary",
+  "temp-migration-spoke",
+  "qa-isolated-spoke"
+]
+
+# ----------------------------------------------------------------------------
+# Advanced Options (Optional)
+# ----------------------------------------------------------------------------
+
+# Custom URL for terracurl destroy operations (rarely needs changing)
+# This is used during terraform destroy to cleanly remove API-based associations
+# destroy_url = "https://checkip.amazonaws.com"
+
+# ----------------------------------------------------------------------------
+# Domain Association Strategy Examples
+# ----------------------------------------------------------------------------
+
+# Example 1: Environment-Based Segmentation
+# domains = ["prod", "staging", "dev", "infra"]
+# Connection Policy:
+#   - prod <-> infra
+#   - staging <-> infra
+#   - dev <-> infra
+#   - staging <-> dev (if needed)
+
+# Example 2: Compliance-Based Segmentation
+# domains = ["pci", "hipaa", "sox", "general", "shared"]
+# Connection Policy:
+#   - pci <-> shared (isolated compliance workload)
+#   - hipaa <-> shared (isolated compliance workload)
+#   - sox <-> shared (isolated compliance workload)
+#   - general <-> shared (general workloads)
+
+# Example 3: Function-Based Segmentation
+# domains = ["web", "app", "data", "mgmt", "external"]
+# Connection Policy:
+#   - external <-> web
+#   - web <-> app
+#   - app <-> data
+#   - mgmt <-> web
+#   - mgmt <-> app
+#   - mgmt <-> data
+
+# Example 4: Hybrid/Multi-Cloud Segmentation
+# domains = ["aws-prod", "azure-prod", "gcp-prod", "on-prem", "shared"]
+# Connection Policy:
+#   - aws-prod <-> shared
+#   - azure-prod <-> shared
+#   - gcp-prod <-> shared
+#   - on-prem <-> shared
+#   - aws-prod <-> on-prem
+#   - azure-prod <-> on-prem
+#   - gcp-prod <-> on-prem
+
+# ----------------------------------------------------------------------------
+# Troubleshooting
+# ----------------------------------------------------------------------------
+
+# Issue: Resources not being associated automatically
+# Solution:
+#   1. Check resource naming matches domain patterns
+#   2. Verify domain names in 'domains' list
+#   3. Review manual associations for conflicts
+#   4. Check exclude lists
+
+# Issue: Wrong domain assignment
+# Solution:
+#   1. Use manual associations to override
+#   2. Adjust resource naming to be more specific
+#   3. Consider domain name ordering (longest match first)
+
+# Issue: "Invalid index" or "split()" errors
+# Solution:
+#   1. Ensure manual association keys have exactly one '~'
+#   2. Format: "name~gateway" not "name-gateway"
+#   3. Check for typos in manual association keys
+
+# Issue: Two-stage apply required
+# Solution:
+#   This is expected behavior due to Terraform for_each limitations
+#   Always run stage 1 (data sources) before stage 2 (resources)

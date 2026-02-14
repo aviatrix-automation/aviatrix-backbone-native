@@ -6,8 +6,8 @@ module "transit" {
     {
       name                 = "ai-1"
       create               = false
-      existing_vpc_name    = "bgp-lan-ai-1-vpc"          # REQUIRED when create = false
-      existing_vpc_project = "rtrentin-01"               # Optional: defaults to project_id
+      existing_vpc_name    = "bgp-lan-ai-1-vpc" # REQUIRED when create = false
+      existing_vpc_project = "rtrentin-01"      # Optional: defaults to project_id
       preset_topology      = "MESH"
     },
     {
@@ -34,7 +34,7 @@ module "transit" {
       bgp_lan_subnets = {
         ai-1 = {
           cidr                 = "10.1.0.0/24"
-          existing_subnet_name = "gcp-us-transit-bgp-lan-ai-1-subnet"  # For existing VPC
+          existing_subnet_name = "gcp-us-transit-bgp-lan-ai-1-subnet" # For existing VPC
         }
       }
       cloud_router_asn            = 16550
@@ -43,8 +43,21 @@ module "transit" {
       firewall_image              = "vmseries-flex-byol"
       firewall_image_version      = "10210h14"
       manual_bgp_advertised_cidrs = ["0.0.0.0/0"]
-      source_ranges               = ["10.0.0.0/8"]
-      ssh_keys                    = "rtrentin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDa2Kz319A3dBeV/bBj5825OGarV5E6zyl70fa3SB2zh2EEsInFY6wj2Dac6nA6vGJTIC5bZPuOhJPsCuniUI+5o4C0df9V8lEQg7PLOcqdeZ3JklfzgvFK/YhWMDQnyJcOxGidVc6ywfyv0h+rbe5V1yhNvudTbvRn84hy/e/RJALBvIT1YUfr98cY+xloH0d/5wWIVtNj37xbwNDA4Eg2qO+84rBHGsIYS6wT+qXNH0IDW2SPQxmnIvf6Sweh2VnlFfn+/lcHhI7XcdjMsYFAKZjdu3ylnWLtbJw4FAY5rL0Q/OAako7pz3OFgGR2al6o/cYVxXjqsfz3yL6Ez32j ricardotrentin@Mac.attlocal.net"
+      bgp_lan_connection_cidrs = {
+        "ai-1" = ["10.10.0.0/16", "10.20.0.0/16"]
+      }
+      # Gateway-level: Enable connection-based learned CIDR approval mode
+      learned_cidr_approval       = "false" # Must be false for connection mode
+      learned_cidrs_approval_mode = "connection"
+      # Per-connection learned CIDR approval (key = NCC hub name)
+      bgp_lan_connection_learned_cidr_approval = {
+        "ai-1" = true
+      }
+      bgp_lan_connection_approved_cidrs = {
+        "ai-1" = ["10.1.0.0/24"]                              # Empty = block all learned routes
+      }
+      source_ranges = ["10.0.0.0/8"]
+      ssh_keys      = "rtrentin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDa2Kz319A3dBeV/bBj5825OGarV5E6zyl70fa3SB2zh2EEsInFY6wj2Dac6nA6vGJTIC5bZPuOhJPsCuniUI+5o4C0df9V8lEQg7PLOcqdeZ3JklfzgvFK/YhWMDQnyJcOxGidVc6ywfyv0h+rbe5V1yhNvudTbvRn84hy/e/RJALBvIT1YUfr98cY+xloH0d/5wWIVtNj37xbwNDA4Eg2qO+84rBHGsIYS6wT+qXNH0IDW2SPQxmnIvf6Sweh2VnlFfn+/lcHhI7XcdjMsYFAKZjdu3ylnWLtbJw4FAY5rL0Q/OAako7pz3OFgGR2al6o/cYVxXjqsfz3yL6Ez32j ricardotrentin@Mac.attlocal.net"
       files = {
         "bootstrap/init-cfg.txt"  = "config/init-cfg.txt"
         "bootstrap/bootstrap.xml" = "config/bootstrap.xml"
@@ -66,7 +79,7 @@ module "transit" {
       gw_size             = "n4-highcpu-8"
       bgp_lan_subnets = {
         ai-2 = {
-          cidr = "10.2.0.0/24"  # For new VPC (ai-2 has create = true)
+          cidr = "10.2.0.0/24" # For new VPC (ai-2 has create = true)
         }
       }
       cloud_router_asn            = 16550
@@ -75,7 +88,14 @@ module "transit" {
       firewall_image              = "vmseries-flex-byol"
       firewall_image_version      = "10210h14"
       manual_bgp_advertised_cidrs = ["0.0.0.0/0"]
-      source_ranges               = ["10.0.0.0/8"]
+      # Gateway-level: Enable connection-based learned CIDR approval mode
+      learned_cidr_approval       = "false" # Must be false for connection mode
+      learned_cidrs_approval_mode = "connection"
+      # Per-connection learned CIDR approval
+      bgp_lan_connection_learned_cidr_approval = {
+        "ai-2" = false # Disable for this connection
+      }
+      source_ranges = ["10.0.0.0/8"]
       ssh_keys                    = "rtrentin:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDa2Kz319A3dBeV/bBj5825OGarV5E6zyl70fa3SB2zh2EEsInFY6wj2Dac6nA6vGJTIC5bZPuOhJPsCuniUI+5o4C0df9V8lEQg7PLOcqdeZ3JklfzgvFK/YhWMDQnyJcOxGidVc6ywfyv0h+rbe5V1yhNvudTbvRn84hy/e/RJALBvIT1YUfr98cY+xloH0d/5wWIVtNj37xbwNDA4Eg2qO+84rBHGsIYS6wT+qXNH0IDW2SPQxmnIvf6Sweh2VnlFfn+/lcHhI7XcdjMsYFAKZjdu3ylnWLtbJw4FAY5rL0Q/OAako7pz3OFgGR2al6o/cYVxXjqsfz3yL6Ez32j ricardotrentin@Mac.attlocal.net"
       files = {
         "bootstrap/init-cfg.txt"  = "config/init-cfg.txt"

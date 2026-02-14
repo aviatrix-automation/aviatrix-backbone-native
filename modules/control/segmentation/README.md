@@ -37,8 +37,8 @@ The module provides:
 
 - **Network Domains**: Creates segmentation domains from the provided list
 - **Connection Policies**: Defines which domains can communicate with each other
-- **Transit Domain Associations**: Auto-associates external connections (Site2Cloud BGP tunnels) to domains based on naming convention
-- **Spoke Domain Associations**: Auto-associates Azure spoke gateways to domains based on gateway naming convention
+- **Transit Domain Associations**: Auto-associates external connections (Site2Cloud BGP tunnels) to domains based on naming convention, with support for manual overrides and exclusions
+- **Spoke Domain Associations**: Auto-associates spoke gateways to domains based on gateway naming convention, with configurable cloud types, manual overrides, and exclusions
 
 ## Architecture
 
@@ -60,26 +60,38 @@ The module provides:
 ┌─────────────────────────────────────────────────────────────────┐
 │                  Domain Associations                            │
 │  Transit Associations:                                          │
-│  - External connections with "external-" prefix                 │
-│  - BGP-enabled Site2Cloud tunnels on AWS/GCP transits           │
+│  - Auto: External connections with "external-" prefix           │
+│  - Manual: Explicit connection~gateway mappings                 │
+│  - Exclusions: Skip specific connections                        │
 │                                                                 │
 │  Spoke Associations:                                            │
-│  - Azure spoke gateways (cloud_type == 8)                       │
-│  - Matched by domain name in gateway name                       │
+│  - Auto: Configurable cloud types (AWS/Azure/GCP)               │
+│  - Manual: Explicit spoke~transit mappings                      │
+│  - Exclusions: Skip specific gateways                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Domain Inference Logic
 
-### Transit Connections
+### Transit Connections (Auto-Inference)
 - Connections with names starting with `external-` are analyzed
 - Domain is inferred by matching domain names within the connection name
-- Only BGP-enabled Site2Cloud tunnels on AWS (cloud_type=1) or GCP (cloud_type=4) are associated
+- Only BGP-enabled Site2Cloud tunnels are associated
+- Can be overridden with `manual_transit_associations`
+- Can exclude specific connections with `exclude_connections`
 
-### Spoke Gateways
-- Azure spoke gateways (cloud_type=8) are analyzed
+### Spoke Gateways (Auto-Inference)
+- Spoke gateways of specified cloud types are analyzed (configurable via `spoke_cloud_types`)
+- Default is Azure only (cloud_type=8), but can include AWS (1), GCP (4), etc.
 - Domain is inferred by matching domain name segments in the gateway name
 - HA gateways (ending with `-hagw`) are excluded
+- Can be overridden with `manual_spoke_associations`
+- Can exclude specific gateways with `exclude_spoke_gateways`
+
+### Override Behavior
+- Manual associations always take precedence over auto-inference
+- Auto-inference and manual associations are merged
+- This allows using auto-inference for most resources while overriding corner cases
 
 ## Two-Stage Apply
 
@@ -144,12 +156,19 @@ terraform apply
 | domains | List of unique domain names for segmentation | `list(string)` | `[]` | no |
 | connection_policy | List of connection policies defining allowed domain communication | `list(object({ source = string, target = string }))` | `[]` | no |
 | destroy_url | Dummy URL used by terracurl during destroy operations | `string` | `"https://checkip.amazonaws.com"` | no |
+| manual_transit_associations | Manual domain associations for transit connections. Map key is `connection_name~gateway_name`, value is domain name. Overrides auto-inference. | `map(string)` | `{}` | no |
+| manual_spoke_associations | Manual domain associations for spoke gateways. Map key is `spoke_name~transit_name`, value is domain name. Overrides auto-inference. | `map(string)` | `{}` | no |
+| exclude_connections | List of connection names to exclude from auto-association | `list(string)` | `[]` | no |
+| exclude_spoke_gateways | List of spoke gateway names to exclude from auto-association | `list(string)` | `[]` | no |
+| spoke_cloud_types | List of cloud types to include for spoke associations. Cloud types: 1=AWS, 8=Azure, 4=GCP, 16=OCI, 32=AliCloud | `list(number)` | `[8]` | no |
 
 ## Outputs
 
 No outputs.
 
 ## Usage
+
+### Basic Usage (Auto-Inference Only)
 
 ```hcl
 module "segmentation" {
@@ -176,9 +195,147 @@ module "segmentation" {
 }
 ```
 
+### Example 1: Manual Overrides for Non-Standard Names
+
+Override auto-inference for connections with non-standard naming:
+
+```hcl
+module "segmentation" {
+  source = "./segmentation"
+
+  aws_ssw_region = "us-east-1"
+
+  domains = ["prod", "dev", "shared"]
+
+  # Auto-inference handles most connections
+  # Manual overrides for legacy connections with non-standard names
+  manual_transit_associations = {
+    "legacy-vpn-connection~transit-hub-1" = "prod"
+    "backup-site2cloud~transit-hub-2"     = "dev"
+  }
+
+  connection_policy = [
+    {
+      source = "prod"
+      target = "shared"
+    }
+  ]
+}
+```
+
+### Example 2: Multi-Cloud Spoke Support
+
+Enable spoke associations for AWS, Azure, and GCP:
+
+```hcl
+module "segmentation" {
+  source = "./segmentation"
+
+  aws_ssw_region = "us-east-1"
+
+  domains = ["prod", "dev"]
+
+  # Enable AWS (1), Azure (8), and GCP (4) spoke associations
+  spoke_cloud_types = [1, 8, 4]
+
+  # Manual associations for spokes with non-standard names
+  manual_spoke_associations = {
+    "aws-legacy-spoke~transit-hub-1"   = "prod"
+    "azure-backup-spoke~transit-hub-2" = "dev"
+  }
+
+  connection_policy = [
+    {
+      source = "prod"
+      target = "dev"
+    }
+  ]
+}
+```
+
+### Example 3: Exclude Test Infrastructure
+
+Exclude test and temporary resources from domain associations:
+
+```hcl
+module "segmentation" {
+  source = "./segmentation"
+
+  aws_ssw_region = "us-east-1"
+
+  domains = ["prod", "dev"]
+
+  # Exclude test connections and gateways from domain association
+  exclude_connections = [
+    "external-test-connection",
+    "external-temp-vpn",
+    "external-sandbox-site2cloud"
+  ]
+
+  exclude_spoke_gateways = [
+    "test-spoke-1",
+    "dev-experimental-spoke",
+    "sandbox-spoke"
+  ]
+
+  connection_policy = [
+    {
+      source = "prod"
+      target = "dev"
+    }
+  ]
+}
+```
+
+### Example 4: Comprehensive Configuration
+
+Combine all features for maximum flexibility:
+
+```hcl
+module "segmentation" {
+  source = "./segmentation"
+
+  aws_ssw_region = "us-east-1"
+
+  domains = ["prod", "dev", "shared", "dmz"]
+
+  # Support all cloud types
+  spoke_cloud_types = [1, 8, 4]  # AWS, Azure, GCP
+
+  # Manual overrides for specific cases
+  manual_transit_associations = {
+    "legacy-connection~transit-prod"  = "prod"
+    "partner-vpn~transit-shared"      = "dmz"
+  }
+
+  manual_spoke_associations = {
+    "special-spoke~transit-prod"      = "prod"
+    "aws-legacy-app~transit-shared"   = "shared"
+  }
+
+  # Exclude test infrastructure
+  exclude_connections = ["external-test-connection"]
+  exclude_spoke_gateways = ["test-spoke"]
+
+  # Connection policies
+  connection_policy = [
+    { source = "prod", target = "shared" },
+    { source = "dev", target = "shared" },
+    { source = "dmz", target = "shared" }
+  ]
+}
+```
+
 ## Notes
 
 - The module uses terracurl to fetch Site2Cloud connections via the Aviatrix API
 - Aviatrix controller credentials are retrieved from AWS SSM Parameter Store
 - Domain names are matched in descending order by length to ensure longer, more specific names match first
 - Only primary gateways are associated (HA gateways are excluded)
+- **Flexibility Features**:
+  - Auto-inference works for most standard naming conventions
+  - Manual associations override auto-inference for corner cases
+  - Exclusion lists skip specific connections or gateways
+  - Spoke cloud types are configurable (AWS, Azure, GCP, etc.)
+  - Manual and auto-inferred associations are merged (manual wins)
+- **Backward Compatibility**: All new variables have empty defaults, so existing configurations work unchanged
