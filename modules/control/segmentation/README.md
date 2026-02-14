@@ -164,7 +164,57 @@ terraform apply
 
 ## Outputs
 
-No outputs.
+### Domain Outputs
+
+| Name | Description |
+|------|-------------|
+| `domains` | Map of created network domain names to their IDs |
+| `domain_list` | List of all domain names |
+| `domain_summary` | Comprehensive summary of each domain with associations and policies |
+
+### Policy Outputs
+
+| Name | Description |
+|------|-------------|
+| `connection_policies` | Map of connection policies between domains |
+| `connection_policy_matrix` | Matrix showing which domains can communicate (bidirectional) |
+
+### Association Outputs
+
+| Name | Description |
+|------|-------------|
+| `transit_associations` | Map of all transit domain associations |
+| `transit_associations_by_domain` | Transit associations grouped by network domain |
+| `transit_associations_by_gateway` | Transit associations grouped by transit gateway |
+| `spoke_associations` | Map of all spoke domain associations |
+| `spoke_associations_by_domain` | Spoke associations grouped by network domain |
+| `spoke_associations_by_transit` | Spoke associations grouped by transit gateway |
+
+### Summary Outputs
+
+| Name | Description |
+|------|-------------|
+| `segmentation_status` | Overall segmentation configuration status and statistics |
+| `association_summary` | Summary of associations by type and source |
+| `association_sources` | Track which associations were auto-inferred vs manually configured |
+| `excluded_resources` | Resources that were excluded from segmentation |
+
+### Analysis Outputs
+
+| Name | Description |
+|------|-------------|
+| `inferred_domain_mappings` | Auto-inferred domain mappings for connections and spokes |
+| `domain_connectivity_graph` | Graph representation of domain connectivity for visualization |
+
+### Debug Outputs
+
+| Name | Description |
+|------|-------------|
+| `debug_filtered_connections` | Debug: filtered Site2Cloud connections used for segmentation associations |
+| `debug_domain_attachment_pairs` | Debug: all domain_attachment_pairs generated for segmentation associations |
+| `debug_connections_list` | Debug: raw Site2Cloud connections list from API |
+
+**See [OUTPUTS_USAGE.md](./OUTPUTS_USAGE.md) for detailed examples and integration patterns.**
 
 ## Usage
 
