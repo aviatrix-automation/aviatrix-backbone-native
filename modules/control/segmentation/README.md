@@ -164,7 +164,108 @@ terraform apply
 
 ## Outputs
 
-No outputs.
+### Domain Outputs
+
+| Name | Description |
+|------|-------------|
+| `domains` | Map of created network domain names to their IDs |
+| `domain_list` | List of all domain names |
+| `domain_summary` | Comprehensive summary of each domain with associations and policies |
+
+### Policy Outputs
+
+| Name | Description |
+|------|-------------|
+| `connection_policies` | Map of connection policies between domains |
+| `connection_policy_matrix` | Matrix showing which domains can communicate (bidirectional) |
+
+### Association Outputs
+
+| Name | Description |
+|------|-------------|
+| `transit_associations` | Map of all transit domain associations |
+| `transit_associations_by_domain` | Transit associations grouped by network domain |
+| `transit_associations_by_gateway` | Transit associations grouped by transit gateway |
+| `spoke_associations` | Map of all spoke domain associations |
+| `spoke_associations_by_domain` | Spoke associations grouped by network domain |
+| `spoke_associations_by_transit` | Spoke associations grouped by transit gateway |
+
+### Summary Outputs
+
+| Name | Description |
+|------|-------------|
+| `segmentation_status` | Overall segmentation configuration status and statistics |
+| `association_summary` | Summary of associations by type and source |
+| `association_sources` | Track which associations were auto-inferred vs manually configured |
+| `excluded_resources` | Resources that were excluded from segmentation |
+
+### Analysis Outputs
+
+| Name | Description |
+|------|-------------|
+| `inferred_domain_mappings` | Auto-inferred domain mappings for connections and spokes |
+| `domain_connectivity_graph` | Graph representation of domain connectivity for visualization |
+
+### Table-Formatted Outputs (Human-Readable)
+
+| Name | Description |
+|------|-------------|
+| `summary_table` | **⭐ Primary** - Concise summary with key metrics in a beautiful box table |
+| `domain_summary_table` | Domain summary in ASCII table format - domains, counts, and connectivity |
+| `transit_associations_table` | Transit associations in ASCII table format |
+| `spoke_associations_table` | Spoke associations in ASCII table format |
+| `connection_policy_table` | Connection policies in ASCII table format |
+| `segmentation_status_table` | Complete status report in formatted text |
+| `association_sources_table` | Association sources (auto vs manual) in table format |
+
+### Debug Outputs
+
+| Name | Description |
+|------|-------------|
+| `debug_filtered_connections` | Debug: filtered Site2Cloud connections used for segmentation associations |
+| `debug_domain_attachment_pairs` | Debug: all domain_attachment_pairs generated for segmentation associations |
+| `debug_connections_list` | Debug: raw Site2Cloud connections list from API |
+
+**See [OUTPUTS_USAGE.md](./OUTPUTS_USAGE.md) for detailed examples and integration patterns.**
+
+### Quick View - Summary Table
+
+**Simplest way to see your segmentation status:**
+
+```bash
+# Option 1: Use the helper script
+./VIEW_SUMMARY.sh
+
+# Option 2: Direct command
+terraform output -raw summary_table
+```
+
+### Viewing Other Table Outputs
+
+For detailed views:
+
+```bash
+# ⭐ View concise summary (recommended - best overview)
+terraform output -raw summary_table
+
+# View detailed domain summary table
+terraform output -raw domain_summary_table
+
+# View transit associations table
+terraform output -raw transit_associations_table
+
+# View spoke associations table
+terraform output -raw spoke_associations_table
+
+# View connection policies table
+terraform output -raw connection_policy_table
+
+# View complete status report
+terraform output -raw segmentation_status_table
+
+# View association sources (auto vs manual)
+terraform output -raw association_sources_table
+```
 
 ## Usage
 
