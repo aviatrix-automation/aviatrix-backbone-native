@@ -25,7 +25,10 @@ variable "transits" {
     local_as_number             = number
     manual_bgp_advertised_cidrs = optional(set(string), [])
     tgw_connection_cidrs        = optional(map(set(string)), {})
-    fw_amount                   = optional(number, 0)
+    # Per-connection learned CIDR approval (key = tgw_name or connection_name)
+    tgw_connection_learned_cidr_approval = optional(map(bool), {})
+    tgw_connection_approved_cidrs        = optional(map(set(string)), {})
+    fw_amount                            = optional(number, 0)
     fw_instance_size            = optional(string, "c5.xlarge")
     firewall_image              = optional(string, "")
     firewall_image_version      = optional(string, "")

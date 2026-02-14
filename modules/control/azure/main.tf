@@ -23,10 +23,16 @@ module "transit" {
       egress_source_ranges   = ["10.0.0.0/8", "129.222.52.198/32"]
       mgmt_source_ranges     = ["10.0.0.0/8", "129.222.52.198/32"]
       lan_source_ranges      = ["10.0.0.0/8", "129.222.52.198/32"]
+      # Gateway-level: Enable connection-based learned CIDR approval mode
+      learned_cidr_approval       = "false" # Must be false for connection mode
+      learned_cidrs_approval_mode = "connection"
       vwan_connections = [
         {
-          vwan_name     = "vwan-infra"
-          vwan_hub_name = "infra"
+          vwan_name                     = "vwan-infra"
+          vwan_hub_name                 = "infra"
+          enable_learned_cidrs_approval = true
+          approved_cidrs                = [] # Empty = block all learned routes
+          manual_bgp_advertised_cidrs   = ["10.0.0.0/8"]
         }
       ]
       # ssh_keys = ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDa2Kz319A3dBeV/bBj5825OGarV5E6zyl70fa3SB2zh2EEsInFY6wj2Dac6nA6vGJTIC5bZPuOhJPsCuniUI+5o4C0df9V8lEQg7PLOcqdeZ3JklfzgvFK/YhWMDQnyJcOxGidVc6ywfyv0h+rbe5V1yhNvudTbvRn84hy/e/RJALBvIT1YUfr98cY+xloH0d/5wWIVtNj37xbwNDA4Eg2qO+84rBHGsIYS6wT+qXNH0IDW2SPQxmnIvf6Sweh2VnlFfn+/lcHhI7XcdjMsYFAKZjdu3ylnWLtbJw4FAY5rL0Q/OAako7pz3OFgGR2al6o/cYVxXjqsfz3yL6Ez32j ricardotrentin@Mac.attlocal.net"]
@@ -49,8 +55,9 @@ module "transit" {
       local_as_number = 65020
       vwan_connections = [
         {
-          vwan_name     = "vwan-prod"
-          vwan_hub_name = "prod"
+          vwan_name                     = "vwan-prod"
+          vwan_hub_name                 = "prod"
+          enable_learned_cidrs_approval = false # Disable for this spoke
         }
       ]
     },
@@ -62,8 +69,10 @@ module "transit" {
       local_as_number = 65022
       vwan_connections = [
         {
-          vwan_name     = "vwan-non-prod"
-          vwan_hub_name = "non-prod"
+          vwan_name                     = "vwan-non-prod"
+          vwan_hub_name                 = "non-prod"
+          enable_learned_cidrs_approval = true
+          approved_cidrs                = ["10.100.0.0/16"] # Allow only specific range
         }
       ]
     }

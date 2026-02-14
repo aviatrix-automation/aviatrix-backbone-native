@@ -1,0 +1,155 @@
+# ============================================================================
+# Transit Gateway Peering Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the peering module.
+# Copy this file and customize for your environment.
+#
+# Usage:
+#   terraform -chdir=modules/control/peering init
+#   terraform -chdir=modules/control/peering plan -var-file=../../peering.tfvars
+#   terraform -chdir=modules/control/peering apply -var-file=../../peering.tfvars
+#
+# Note: This module creates full-mesh peering between transit gateways.
+#       It automatically discovers all transit gateways and creates peerings.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssm_region = "us-east-1"
+
+# ----------------------------------------------------------------------------
+# Same-Cloud Peering Configuration
+# ----------------------------------------------------------------------------
+# Settings for peering between transit gateways in the SAME cloud provider
+# (e.g., AWS-to-AWS, Azure-to-Azure, GCP-to-GCP)
+
+# Enable peering over private network for same-cloud peering
+# Only applies when two transit gateways are in Insane Mode
+# Benefits: Lower latency, no egress charges, better security
+same_cloud_enable_peering_over_private_network = true
+
+# Enable maximum amount of HPE (High Performance Encryption) tunnels
+# Only valid when transit gateways are in Insane Mode and same cloud type
+# Supported for AWS, GCP, and Azure
+# Benefits: Maximum throughput (up to 100 Gbps+)
+same_cloud_enable_max_performance = true
+
+# Enable peering with Single-Tunnel mode
+# Only applies with enable_peering_over_private_network
+# Use case: Cost optimization when maximum throughput not needed
+same_cloud_enable_single_tunnel_mode = false
+
+# ----------------------------------------------------------------------------
+# Cross-Cloud Peering Configuration
+# ----------------------------------------------------------------------------
+# Settings for peering between transit gateways in DIFFERENT cloud providers
+# (e.g., AWS-to-Azure, AWS-to-GCP, Azure-to-GCP)
+
+# Enable peering over private network for cross-cloud peering
+# Only applies when two transit gateways are in Insane Mode and different cloud types
+# Requires underlying cloud connectivity (e.g., AWS Direct Connect to Azure ExpressRoute)
+cross_cloud_enable_peering_over_private_network = false
+
+# Enable Insane Mode Encryption over Internet for cross-cloud peering
+# Transit gateways must be in Insane Mode
+# Supported among AWS, GCP, and Azure
+# Benefits: High-throughput encrypted connectivity over internet
+cross_cloud_enable_insane_mode_encryption_over_internet = true
+
+# Enable peering with Single-Tunnel mode for cross-cloud
+# Only applies with enable_peering_over_private_network
+cross_cloud_enable_single_tunnel_mode = false
+
+# Number of public tunnels for cross-cloud Insane Mode Encryption over Internet
+# Valid range: 2-20
+# Supported for cross-cloud peerings with HPE
+# Higher tunnel count = higher aggregate throughput
+cross_cloud_tunnel_count = 4
+
+# ----------------------------------------------------------------------------
+# Configuration Examples and Use Cases
+# ----------------------------------------------------------------------------
+
+# Example 1: High-Performance Same-Cloud Peering (Default)
+# Use case: Maximum throughput between AWS transits
+# Configuration:
+#   same_cloud_enable_peering_over_private_network = true
+#   same_cloud_enable_max_performance              = true
+#   same_cloud_enable_single_tunnel_mode           = false
+
+# Example 2: Cost-Optimized Same-Cloud Peering
+# Use case: Lower throughput requirements, cost-sensitive
+# Configuration:
+#   same_cloud_enable_peering_over_private_network = true
+#   same_cloud_enable_max_performance              = false
+#   same_cloud_enable_single_tunnel_mode           = true
+
+# Example 3: Standard Cross-Cloud Peering over Internet
+# Use case: Multi-cloud connectivity without private links
+# Configuration:
+#   cross_cloud_enable_peering_over_private_network                = false
+#   cross_cloud_enable_insane_mode_encryption_over_internet        = true
+#   cross_cloud_tunnel_count                                       = 4
+
+# Example 4: High-Performance Cross-Cloud with Private Connectivity
+# Use case: AWS Direct Connect to Azure ExpressRoute established
+# Configuration:
+#   cross_cloud_enable_peering_over_private_network                = true
+#   cross_cloud_enable_insane_mode_encryption_over_internet        = false
+#   cross_cloud_enable_single_tunnel_mode                          = false
+
+# Example 5: Maximum Cross-Cloud Throughput over Internet
+# Use case: Data replication, backup/DR between clouds
+# Configuration:
+#   cross_cloud_enable_peering_over_private_network                = false
+#   cross_cloud_enable_insane_mode_encryption_over_internet        = true
+#   cross_cloud_tunnel_count                                       = 20
+
+# ----------------------------------------------------------------------------
+# Performance Guidelines
+# ----------------------------------------------------------------------------
+
+# Same-Cloud Peering Throughput:
+#   - Standard (no HPE): Up to 1.25 Gbps per tunnel
+#   - HPE Insane Mode + Max Performance: 50-100+ Gbps
+#   - HPE Insane Mode + Single Tunnel: ~10 Gbps
+
+# Cross-Cloud Peering Throughput:
+#   - Standard (no HPE): Up to 1.25 Gbps per tunnel
+#   - HPE over Internet (2 tunnels): ~20 Gbps
+#   - HPE over Internet (4 tunnels): ~40 Gbps
+#   - HPE over Internet (20 tunnels): ~100 Gbps
+#   - HPE over Private Network: 50-100+ Gbps
+
+# ----------------------------------------------------------------------------
+# Important Notes
+# ----------------------------------------------------------------------------
+
+# 1. Insane Mode Requirements:
+#    - Both transit gateways must be deployed in Insane Mode
+#    - Requires instance types that support enhanced networking
+#    - AWS: c5 family or newer, GCP: n2 family, Azure: D/E v4/v5 series
+
+# 2. Private Network Connectivity:
+#    - Requires pre-existing private connectivity between clouds
+#    - AWS: Direct Connect, Azure: ExpressRoute, GCP: Partner Interconnect
+#    - More complex setup but better performance and security
+
+# 3. Cost Considerations:
+#    - Private network peering: No internet egress charges
+#    - Internet peering: Standard cloud egress charges apply
+#    - More tunnels = higher throughput but also higher instance costs
+
+# 4. Full-Mesh Behavior:
+#    - This module automatically creates full-mesh peering
+#    - If you have 3 transit gateways, it creates 3 peering connections
+#    - If you have 4 transit gateways, it creates 6 peering connections
+#    - Formula: n * (n-1) / 2 where n = number of transits
+
+# 5. Gateway Discovery:
+#    - Module uses data source to discover all transit gateways
+#    - Automatically excludes gateways with "-hagw" suffix (HA gateways)
+#    - Peering is created for primary gateways only

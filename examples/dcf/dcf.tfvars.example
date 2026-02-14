@@ -1,0 +1,267 @@
+# ============================================================================
+# Distributed Cloud Firewall (DCF) Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the DCF module.
+# Copy this file and customize for your environment.
+#
+# Usage:
+#   terraform -chdir=modules/control/dcf init
+#   terraform -chdir=modules/control/dcf plan -var-file=../../dcf.tfvars
+#   terraform -chdir=modules/control/dcf apply -var-file=../../dcf.tfvars
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssw_region = "us-east-1"
+
+# ----------------------------------------------------------------------------
+# DCF Global Settings
+# ----------------------------------------------------------------------------
+
+# Enable or disable distributed firewalling globally
+enable_distributed_firewalling = true
+
+# Default action for traffic not matching any policy
+# Options: "PERMIT" or "DENY"
+distributed_firewalling_default_action_rule_action = "DENY"
+
+# Enable logging for default action rule
+distributed_firewalling_default_action_rule_logging = true
+
+# ----------------------------------------------------------------------------
+# Smart Groups
+# ----------------------------------------------------------------------------
+# Smart groups define collections of resources based on CIDR or VM tags
+# These can reference existing groups or create new ones
+
+smarties = {
+  # CIDR-based smart group
+  "web-tier" = {
+    cidr = "10.1.0.0/24"
+  }
+
+  "app-tier" = {
+    cidr = "10.2.0.0/24"
+  }
+
+  "db-tier" = {
+    cidr = "10.3.0.0/24"
+  }
+
+  # Tag-based smart group (for VM/instance tags)
+  "prod-servers" = {
+    tags = {
+      "Environment" = "Production"
+      "Tier"        = "Application"
+    }
+  }
+
+  "dev-servers" = {
+    tags = {
+      "Environment" = "Development"
+    }
+  }
+
+  # DMZ zone
+  "dmz-zone" = {
+    cidr = "10.100.0.0/24"
+  }
+
+  # On-premises networks
+  "on-prem-dc1" = {
+    cidr = "172.16.0.0/16"
+  }
+
+  "on-prem-dc2" = {
+    cidr = "172.17.0.0/16"
+  }
+
+  # Management network
+  "mgmt-network" = {
+    cidr = "10.254.0.0/24"
+  }
+
+  # External services
+  "external-partners" = {
+    cidr = "198.51.100.0/24"
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Firewall Policies
+# ----------------------------------------------------------------------------
+# Define distributed firewall policies between smart groups
+# Policies are evaluated in priority order (lower number = higher priority)
+
+policies = {
+  # =========================================================================
+  # Allow Rules (PERMIT)
+  # =========================================================================
+
+  "allow-web-to-app" = {
+    action           = "PERMIT"
+    priority         = 100
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["web-tier"]
+    dst_smart_groups = ["app-tier"]
+    port_ranges      = ["443", "8080"]
+  }
+
+  "allow-app-to-db" = {
+    action           = "PERMIT"
+    priority         = 110
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["app-tier"]
+    dst_smart_groups = ["db-tier"]
+    port_ranges      = ["3306", "5432"]  # MySQL, PostgreSQL
+  }
+
+  "allow-mgmt-to-all" = {
+    action           = "PERMIT"
+    priority         = 50
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["mgmt-network"]
+    dst_smart_groups = ["web-tier", "app-tier", "db-tier"]
+    port_ranges      = ["22", "3389"]  # SSH, RDP
+  }
+
+  "allow-prod-internal" = {
+    action           = "PERMIT"
+    priority         = 120
+    protocol         = "any"
+    logging          = false
+    watch            = false
+    src_smart_groups = ["prod-servers"]
+    dst_smart_groups = ["prod-servers"]
+    port_ranges      = []
+  }
+
+  "allow-onprem-to-cloud" = {
+    action           = "PERMIT"
+    priority         = 150
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["on-prem-dc1", "on-prem-dc2"]
+    dst_smart_groups = ["app-tier", "db-tier"]
+    port_ranges      = ["443", "8443"]
+  }
+
+  "allow-dmz-to-web" = {
+    action           = "PERMIT"
+    priority         = 130
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["dmz-zone"]
+    dst_smart_groups = ["web-tier"]
+    port_ranges      = ["443"]
+  }
+
+  # ICMP (ping) - no port ranges for ICMP protocol
+  "allow-icmp-monitoring" = {
+    action           = "PERMIT"
+    priority         = 200
+    protocol         = "icmp"
+    logging          = false
+    watch            = false
+    src_smart_groups = ["mgmt-network"]
+    dst_smart_groups = ["web-tier", "app-tier", "db-tier"]
+    port_ranges      = []
+  }
+
+  # =========================================================================
+  # Deny Rules (DENY)
+  # =========================================================================
+
+  "deny-external-to-db" = {
+    action           = "DENY"
+    priority         = 10
+    protocol         = "any"
+    logging          = true
+    watch            = true  # Enable watch mode for monitoring/alerting
+    src_smart_groups = ["external-partners", "dmz-zone"]
+    dst_smart_groups = ["db-tier"]
+    port_ranges      = []
+  }
+
+  "deny-dev-to-prod" = {
+    action           = "DENY"
+    priority         = 20
+    protocol         = "any"
+    logging          = true
+    watch            = true
+    src_smart_groups = ["dev-servers"]
+    dst_smart_groups = ["prod-servers"]
+    port_ranges      = []
+  }
+
+  "deny-internet-to-internal" = {
+    action           = "DENY"
+    priority         = 30
+    protocol         = "any"
+    logging          = true
+    watch            = true
+    src_smart_groups = ["external-partners"]
+    dst_smart_groups = ["app-tier", "db-tier", "mgmt-network"]
+    port_ranges      = []
+  }
+
+  # =========================================================================
+  # Watch Rules (for monitoring without enforcement)
+  # =========================================================================
+  # Set action to PERMIT but watch = true to monitor traffic patterns
+
+  "watch-unusual-db-access" = {
+    action           = "PERMIT"
+    priority         = 500
+    protocol         = "tcp"
+    logging          = true
+    watch            = true  # Monitor without blocking
+    src_smart_groups = ["web-tier"]
+    dst_smart_groups = ["db-tier"]
+    port_ranges      = ["3306", "5432"]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Notes and Best Practices
+# ----------------------------------------------------------------------------
+
+# Priority Guidelines:
+#   1-99   : Critical deny rules (security policies)
+#   100-199: Core allow rules (application flows)
+#   200-299: Secondary allow rules (monitoring, backups)
+#   300-399: Dev/Test environment rules
+#   400-499: Temporary/Testing rules
+#   500+   : Watch/Monitor rules
+
+# Protocol Options:
+#   - "tcp", "udp", "icmp", "any"
+#   - ICMP does not use port_ranges
+
+# Port Ranges:
+#   - Single port: ["443"]
+#   - Multiple ports: ["443", "8080", "8443"]
+#   - Port ranges not supported (use separate rules)
+#   - Empty list [] for "any" protocol or ICMP
+
+# Logging:
+#   - Enable for security policies and deny rules
+#   - Consider disabling for high-volume permit rules
+#   - Always enable for watch rules
+
+# Watch Mode:
+#   - Enables monitoring without enforcement
+#   - Useful for testing new policies
+#   - Generates logs and metrics
+#   - Can be used with PERMIT or DENY actions

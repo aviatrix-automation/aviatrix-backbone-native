@@ -98,8 +98,11 @@ variable "transits" {
     learned_cidrs_approval_mode = optional(string, null)
     approved_learned_cidrs      = optional(list(string), null)
     vwan_connections = optional(list(object({
-      vwan_name     = string
-      vwan_hub_name = string
+      vwan_name                         = string
+      vwan_hub_name                     = string
+      enable_learned_cidrs_approval     = optional(bool, false)
+      approved_cidrs                    = optional(set(string), [])
+      manual_bgp_advertised_cidrs       = optional(list(string))
     })))
   }))
   default = {}
@@ -134,8 +137,11 @@ variable "spokes" {
     enable_max_performance           = optional(bool, true)   # Enable maximum performance for spoke gateway
     disable_route_propagation        = optional(bool, false)  # Disable route propagation on spoke subnets
     vwan_connections = optional(list(object({
-      vwan_name     = string
-      vwan_hub_name = string
+      vwan_name                         = string
+      vwan_hub_name                     = string
+      enable_learned_cidrs_approval     = optional(bool, false)
+      approved_cidrs                    = optional(set(string), [])
+      manual_bgp_advertised_cidrs       = optional(list(string))
     })))
   }))
   default = {}

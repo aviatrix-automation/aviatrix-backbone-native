@@ -135,8 +135,11 @@ locals {
           primary = module.mc-transit[transit_key].transit_gateway.bgp_lan_ip_list[0]
           ha      = module.mc-transit[transit_key].transit_gateway.ha_bgp_lan_ip_list[0]
         }
-        pair_key        = "${transit_key}.${conn.vwan_hub_name}.${idx}"
-        remote_vpc_name = "${local.hub_managed_vnets[conn.vwan_hub_name].vnet_name}:${local.hub_managed_vnets[conn.vwan_hub_name].resource_group}:${local.hub_managed_vnets[conn.vwan_hub_name].subscription_id}"
+        pair_key                      = "${transit_key}.${conn.vwan_hub_name}.${idx}"
+        remote_vpc_name               = "${local.hub_managed_vnets[conn.vwan_hub_name].vnet_name}:${local.hub_managed_vnets[conn.vwan_hub_name].resource_group}:${local.hub_managed_vnets[conn.vwan_hub_name].subscription_id}"
+        enable_learned_cidrs_approval = conn.enable_learned_cidrs_approval
+        approved_cidrs                = conn.approved_cidrs
+        manual_bgp_advertised_cidrs   = conn.manual_bgp_advertised_cidrs
       } if try(conn.vwan_hub_name != "", false) && contains(keys(var.vwan_hubs), conn.vwan_hub_name)
     ] if length(transit.vwan_connections != null ? transit.vwan_connections : []) > 0
   ])
@@ -154,8 +157,11 @@ locals {
           primary = module.mc-spoke[spoke_key].spoke_gateway.bgp_lan_ip_list[0]
           ha      = module.mc-spoke[spoke_key].spoke_gateway.ha_bgp_lan_ip_list[0]
         }
-        pair_key        = "${spoke_key}.${conn.vwan_hub_name}.${idx}"
-        remote_vpc_name = "${local.hub_managed_vnets[conn.vwan_hub_name].vnet_name}:${local.hub_managed_vnets[conn.vwan_hub_name].resource_group}:${local.hub_managed_vnets[conn.vwan_hub_name].subscription_id}"
+        pair_key                      = "${spoke_key}.${conn.vwan_hub_name}.${idx}"
+        remote_vpc_name               = "${local.hub_managed_vnets[conn.vwan_hub_name].vnet_name}:${local.hub_managed_vnets[conn.vwan_hub_name].resource_group}:${local.hub_managed_vnets[conn.vwan_hub_name].subscription_id}"
+        enable_learned_cidrs_approval = conn.enable_learned_cidrs_approval
+        approved_cidrs                = conn.approved_cidrs
+        manual_bgp_advertised_cidrs   = conn.manual_bgp_advertised_cidrs
       } if try(conn.vwan_hub_name != "", false) && contains(keys(var.vwan_hubs), conn.vwan_hub_name)
     ] if length(spoke.vwan_connections != null ? spoke.vwan_connections : []) > 0
   ])
@@ -912,13 +918,16 @@ resource "aviatrix_transit_external_device_conn" "transit_external" {
   backup_bgp_remote_as_num  = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
   remote_lan_ip             = local.vwan_connect_ip[each.key].hub_ip_primary
   backup_remote_lan_ip      = local.vwan_connect_ip[each.key].hub_ip_ha
-  local_lan_ip              = each.value.bgp_lan_ips.primary
-  backup_local_lan_ip       = each.value.bgp_lan_ips.ha
-  enable_bgp_lan_activemesh = true
-  direct_connect            = false
-  custom_algorithms         = false
-  enable_edge_segmentation  = false
-  phase1_local_identifier   = null
+  local_lan_ip                  = each.value.bgp_lan_ips.primary
+  backup_local_lan_ip           = each.value.bgp_lan_ips.ha
+  enable_bgp_lan_activemesh     = true
+  direct_connect                = false
+  custom_algorithms             = false
+  enable_edge_segmentation      = false
+  phase1_local_identifier       = null
+  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
+  approved_cidrs                = each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
+  manual_bgp_advertised_cidrs   = each.value.manual_bgp_advertised_cidrs
 
   depends_on = [
     time_sleep.wait_for_hub_connection,

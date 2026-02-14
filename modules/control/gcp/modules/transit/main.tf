@@ -884,12 +884,14 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
-        gw_name                     = transit.gw_name
-        project_id                  = transit.project_id
-        region                      = transit.region
-        subnet                      = subnet
-        intf_type                   = intf_type
-        manual_bgp_advertised_cidrs = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
+        gw_name                           = transit.gw_name
+        project_id                        = transit.project_id
+        region                            = transit.region
+        subnet                            = subnet
+        intf_type                         = intf_type
+        manual_bgp_advertised_cidrs       = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
+        enable_learned_cidrs_approval     = try(transit.bgp_lan_connection_learned_cidr_approval[intf_type], false)
+        approved_cidrs                    = try(transit.bgp_lan_connection_approved_cidrs[intf_type], [])
       } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
@@ -905,10 +907,12 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   ha_enabled                = true
   backup_bgp_remote_as_num  = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
   backup_remote_lan_ip      = local.bgp_lan_addresses["${each.key}-ha"].address
-  backup_local_lan_ip       = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
-  enable_bgp_lan_activemesh = true
+  backup_local_lan_ip           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
+  enable_bgp_lan_activemesh     = true
 
-  manual_bgp_advertised_cidrs = each.value.manual_bgp_advertised_cidrs
+  manual_bgp_advertised_cidrs   = each.value.manual_bgp_advertised_cidrs
+  enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
+  approved_cidrs                = each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
 
   depends_on = [
     module.mc_transit,

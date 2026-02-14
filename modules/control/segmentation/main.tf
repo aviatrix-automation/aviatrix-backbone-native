@@ -64,7 +64,7 @@ locals {
       attachment_name = split("~", key)[0]
       transit_gateway = split("~", key)[1]
     }
-    if contains(local.defined_domains, domain)
+    if contains(local.defined_domains, domain) && length(split("~", key)) == 2
   }
 
   # Merge: manual takes precedence over auto-inferred
@@ -121,7 +121,7 @@ locals {
       transit_gateway = split("~", key)[1]
       network_domain  = domain
     }
-    if contains(local.defined_domains, domain)
+    if contains(local.defined_domains, domain) && length(split("~", key)) == 2
   }
 
   # Merge: manual takes precedence over auto-inferred
@@ -148,7 +148,7 @@ resource "terracurl_request" "aviatrix_connections" {
   name            = "aviatrix_connections"
   url             = "https://${data.aws_ssm_parameter.aviatrix_ip.value}/v2/api"
   method          = "POST"
-  skip_tls_verify = false
+  skip_tls_verify = true
 
   request_body = jsonencode({
     action = "list_site2cloud"

@@ -41,4 +41,12 @@ No modules.
 
 ## Outputs
 
-No outputs.
+| Name | Description |
+|------|-------------|
+| <a name="output_created_smart_groups"></a> [created\_smart\_groups](#output\_created\_smart\_groups) | Map of created smart group names to their UUIDs |
+| <a name="output_created_smart_groups_details"></a> [created\_smart\_groups\_details](#output\_created\_smart\_groups\_details) | Full details of created smart groups including selectors |
+| <a name="output_all_smart_groups"></a> [all\_smart\_groups](#output\_all\_smart\_groups) | Map of all smart group names to their UUIDs (existing + created) |
+| <a name="output_policies_summary"></a> [policies\_summary](#output\_policies\_summary) | Summary of configured distributed firewall policies |
+| <a name="output_dcf_status"></a> [dcf\_status](#output\_dcf\_status) | Distributed Cloud Firewall configuration status |
+| <a name="output_policy_list_id"></a> [policy\_list\_id](#output\_policy\_list\_id) | ID of the distributed firewalling policy list resource |
+| <a name="output_smart_group_uuid_lookup"></a> [smart\_group\_uuid\_lookup](#output\_smart\_group\_uuid\_lookup) | Helper output for looking up smart group UUIDs by name with source indication |

@@ -37,6 +37,14 @@ variable "manual_transit_associations" {
     ])
     error_message = "All manual transit associations must reference domains defined in var.domains"
   }
+
+  validation {
+    condition = alltrue([
+      for key in keys(var.manual_transit_associations) :
+      length(split("~", key)) == 2
+    ])
+    error_message = "All manual_transit_associations keys must be in format 'connection_name~gateway_name' with exactly one '~' separator"
+  }
 }
 
 variable "manual_spoke_associations" {
@@ -50,6 +58,14 @@ variable "manual_spoke_associations" {
       contains(var.domains, domain)
     ])
     error_message = "All manual spoke associations must reference domains defined in var.domains"
+  }
+
+  validation {
+    condition = alltrue([
+      for key in keys(var.manual_spoke_associations) :
+      length(split("~", key)) == 2
+    ])
+    error_message = "All manual_spoke_associations keys must be in format 'spoke_name~transit_name' with exactly one '~' separator"
   }
 }
 

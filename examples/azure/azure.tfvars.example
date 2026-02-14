@@ -1,0 +1,234 @@
+# ============================================================================
+# Azure Transit Module - Example Configuration
+# ============================================================================
+# This file demonstrates all available variables for the Azure transit module.
+# Copy this file and customize for your environment.
+#
+# Usage:
+#   terraform -chdir=modules/control/azure init
+#   terraform -chdir=modules/control/azure plan -var-file=../../azure.tfvars
+#   terraform -chdir=modules/control/azure apply -var-file=../../azure.tfvars
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Required Variables
+# ----------------------------------------------------------------------------
+
+# AWS region for SSM parameter retrieval (controller credentials)
+aws_ssm_region = "us-east-1"
+
+# Azure region for resource deployment
+region = "East US 2"
+
+# Azure subscription ID
+subscription_id = "12345678-1234-1234-1234-123456789012"
+
+# ----------------------------------------------------------------------------
+# Tags (Optional)
+# ----------------------------------------------------------------------------
+
+tags = {
+  Environment = "Production"
+  Customer    = "MyCompany"
+  CostCenter  = "IT-Network"
+  ManagedBy   = "Terraform"
+}
+
+# ----------------------------------------------------------------------------
+# Transit Gateways
+# ----------------------------------------------------------------------------
+
+transits = {
+  "az-eastus2-transit-vnet" = {
+    cidr                   = "10.1.0.0/23"
+    instance_size          = "Standard_D8_v5"
+    account                = "azure-prod"
+    local_as_number        = 65021
+    fw_amount              = 2
+    firewall_image_version = "11.2.5"
+    fw_instance_size       = "Standard_D3_v2"
+    egress_source_ranges   = ["10.0.0.0/8", "203.0.113.0/24"]
+    mgmt_source_ranges     = ["10.0.0.0/8", "203.0.113.0/24"]
+    lan_source_ranges      = ["10.0.0.0/8", "203.0.113.0/24"]
+
+    # ========================================================================
+    # Learned CIDR Approval (NEW FEATURE - Connection Mode)
+    # ========================================================================
+
+    # Gateway-level: Enable connection-based learned CIDR approval mode
+    learned_cidr_approval       = "false" # MUST be false for connection mode
+    learned_cidrs_approval_mode = "connection"
+
+    # ========================================================================
+    # vWAN Connections
+    # ========================================================================
+
+    # Per-connection configuration for vWAN hubs
+    vwan_connections = [
+      {
+        vwan_name                     = "vwan-prod"
+        vwan_hub_name                 = "prod"
+        enable_learned_cidrs_approval = true
+        approved_cidrs                = [] # Empty = block all learned routes
+        manual_bgp_advertised_cidrs   = ["10.0.0.0/8"]
+      },
+      {
+        vwan_name                     = "vwan-non-prod"
+        vwan_hub_name                 = "non-prod"
+        enable_learned_cidrs_approval = true
+        approved_cidrs                = ["172.16.0.0/12"]
+        manual_bgp_advertised_cidrs   = ["10.1.0.0/16"]
+      }
+    ]
+
+    # ========================================================================
+    # Firewall Bootstrap Configuration (Optional)
+    # ========================================================================
+
+    # SSH keys for firewall management (optional)
+    # ssh_keys = ["ssh-rsa AAAAB3Nza..."]
+
+    # Enable password authentication for firewall
+    enable_password_auth = true
+
+    # File shares for firewall bootstrap
+    file_shares = {
+      "bootstrap" = {
+        name                   = "bootstrap"
+        bootstrap_package_path = "${path.module}/bootstrap"
+      }
+    }
+  }
+
+  "az-westus2-transit-vnet" = {
+    cidr            = "10.2.0.0/23"
+    instance_size   = "Standard_D8_v5"
+    account         = "azure-prod"
+    local_as_number = 65022
+
+    # Simple configuration without firewall
+    fw_amount = 0
+
+    vwan_connections = [
+      {
+        vwan_name                     = "vwan-infra"
+        vwan_hub_name                 = "infra"
+        enable_learned_cidrs_approval = false
+        manual_bgp_advertised_cidrs   = ["10.0.0.0/8"]
+      }
+    ]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# Spoke Gateways
+# ----------------------------------------------------------------------------
+
+spokes = {
+  "az-eastus2-spoke-1-vnet" = {
+    cidr            = "10.10.0.0/24"
+    instance_size   = "Standard_D4_v5"
+    account         = "azure-prod"
+    enable_bgp      = true
+    local_as_number = 65020
+
+    vwan_connections = [
+      {
+        vwan_name                     = "vwan-prod"
+        vwan_hub_name                 = "prod"
+        enable_learned_cidrs_approval = false
+      }
+    ]
+  }
+
+  "az-eastus2-spoke-2-vnet" = {
+    cidr            = "10.20.0.0/24"
+    instance_size   = "Standard_D4_v5"
+    account         = "azure-prod"
+    enable_bgp      = true
+    local_as_number = 65025
+
+    vwan_connections = [
+      {
+        vwan_name                     = "vwan-non-prod"
+        vwan_hub_name                 = "non-prod"
+        enable_learned_cidrs_approval = true
+        approved_cidrs                = ["10.100.0.0/16"]
+      }
+    ]
+  }
+}
+
+# ----------------------------------------------------------------------------
+# vWAN Configurations
+# ----------------------------------------------------------------------------
+
+vwan_configs = {
+  "vwan-prod" = {
+    location            = "East US 2"
+    resource_group_name = "rg-vwan-prod"
+    existing            = false  # Set to true if using existing vWAN
+  }
+
+  "vwan-non-prod" = {
+    location            = "East US 2"
+    resource_group_name = "rg-vwan-non-prod"
+    existing            = false
+  }
+
+  "vwan-infra" = {
+    location            = "West US 2"
+    resource_group_name = "rg-vwan-infra"
+    existing            = false
+  }
+}
+
+# ----------------------------------------------------------------------------
+# vWAN Hubs
+# ----------------------------------------------------------------------------
+
+vwan_hubs = {
+  "prod" = {
+    vwan_name           = "vwan-prod"
+    location            = "East US 2"
+    resource_group_name = "rg-vwan-prod"
+    existing            = false
+    address_prefix      = "10.100.0.0/23"
+  }
+
+  "non-prod" = {
+    vwan_name           = "vwan-non-prod"
+    location            = "East US 2"
+    resource_group_name = "rg-vwan-non-prod"
+    existing            = false
+    address_prefix      = "10.101.0.0/23"
+  }
+
+  "infra" = {
+    vwan_name           = "vwan-infra"
+    location            = "West US 2"
+    resource_group_name = "rg-vwan-infra"
+    existing            = false
+    address_prefix      = "10.102.0.0/23"
+  }
+}
+
+# ----------------------------------------------------------------------------
+# External Spoke VNets (Optional)
+# ----------------------------------------------------------------------------
+# Connect existing Azure VNets to vWAN hubs
+
+# external_spoke_vnets = {
+#   "workload-vnet-1" = {
+#     resource_group_name = "rg-workload-1"
+#     vwan_name           = "vwan-prod"
+#     vwan_hub_name       = "prod"
+#     existing            = true
+#   }
+#   "workload-vnet-2" = {
+#     resource_group_name = "rg-workload-2"
+#     vwan_name           = "vwan-non-prod"
+#     vwan_hub_name       = "non-prod"
+#     existing            = true
+#   }
+# }

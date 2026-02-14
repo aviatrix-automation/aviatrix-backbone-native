@@ -2,7 +2,13 @@
 # GCP Transit Module - Example Configuration
 # ============================================================================
 # This file demonstrates all available variables for the GCP transit module.
-# Copy to terraform.tfvars and customize for your environment.
+# Copy this file and customize for your environment.
+#
+# Usage:
+#   terraform -chdir=modules/control/gcp init
+#   terraform -chdir=modules/control/gcp plan -var-file=../../gcp.tfvars
+#   terraform -chdir=modules/control/gcp apply -var-file=../../gcp.tfvars
+# ============================================================================
 
 # ----------------------------------------------------------------------------
 # Required Variables
@@ -20,12 +26,12 @@ project_id = "my-gcp-project"
 
 ncc_hubs = [
   {
-    name            = "hub-us-east"
+    name            = "hub-us-central"
     create          = true
     preset_topology = "MESH"
   },
   {
-    name            = "hub-us-west"
+    name            = "hub-us-east"
     create          = true
     preset_topology = "MESH"
   },
@@ -68,10 +74,10 @@ transits = [
     # Each entry creates a BGP-over-LAN connection to an NCC hub
     # Keys must match NCC hub names defined above
     bgp_lan_subnets = {
-      "hub-us-east" = {
+      "hub-us-central" = {
         cidr = "192.168.1.0/29"  # New subnet for BGP LAN
       }
-      "hub-us-west" = {
+      "hub-us-east" = {
         cidr = "192.168.2.0/29"  # New subnet for BGP LAN
       }
       "hub-europe" = {
@@ -92,9 +98,29 @@ transits = [
     # - If specified, overrides transit-wide setting for that hub
     # - If not specified for a hub, uses manual_bgp_advertised_cidrs
     bgp_lan_connection_cidrs = {
-      "hub-us-east" = ["10.10.0.0/16", "10.20.0.0/16"]
-      "hub-us-west" = ["10.10.0.0/16"]
+      "hub-us-central" = ["10.10.0.0/16", "10.20.0.0/16"]
+      "hub-us-east"    = ["10.10.0.0/16"]
       # hub-europe not listed, will use manual_bgp_advertised_cidrs
+    }
+
+    # ========================================================================
+    # Learned CIDR Approval (NEW FEATURE - Connection Mode)
+    # ========================================================================
+
+    # Gateway-level: Enable connection-based learned CIDR approval mode
+    learned_cidr_approval       = "false" # MUST be false for connection mode
+    learned_cidrs_approval_mode = "connection"
+
+    # Per-NCC hub learned CIDR approval
+    # Maps NCC hub name to learned CIDR approval settings
+    bgp_lan_connection_learned_cidr_approval = {
+      "hub-us-central" = true
+      "hub-us-east"    = true
+    }
+    bgp_lan_connection_approved_cidrs = {
+      "hub-us-central" = ["172.16.0.0/12"]
+      "hub-us-east"    = []  # Empty = block all learned routes
+      # Not listed = approval disabled for that hub
     }
 
     # ========================================================================
@@ -124,23 +150,15 @@ transits = [
       "bootstrap/init-cfg.txt"  = "config/init-cfg.txt"
       "bootstrap/bootstrap.xml" = "config/bootstrap.xml"
     }
-
-    # ========================================================================
-    # BGP Learned CIDRs Configuration (Optional)
-    # ========================================================================
-
-    learned_cidr_approval       = "false"
-    learned_cidrs_approval_mode = null
-    approved_learned_cidrs      = null
   },
 
   {
     # Simple transit without firewall
-    gw_name             = "gcp-europe-transit"
+    gw_name             = "gcp-us-east-transit"
     project_id          = "my-gcp-project"
-    region              = "europe-west1"
-    zone                = "europe-west1-b"
-    ha_zone             = "europe-west1-c"
+    region              = "us-east1"
+    zone                = "us-east1-b"
+    ha_zone             = "us-east1-c"
     name                = "transit-2"
     vpc_cidr            = "10.20.0.0/16"
     lan_cidr            = "10.20.1.0/24"
@@ -151,7 +169,7 @@ transits = [
     aviatrix_gw_asn  = 64518
 
     bgp_lan_subnets = {
-      "hub-europe" = {
+      "hub-us-east" = {
         cidr = "192.168.10.0/29"
       }
     }
@@ -171,7 +189,7 @@ transits = [
 external_devices = {
   "datacenter-1" = {
     transit_gw_name    = "gcp-us-central-transit"
-    connection_name    = "datacenter-primary"
+    connection_name    = "external-prod-datacenter-primary"
     remote_gateway_ip  = "203.0.113.10"
     bgp_enabled        = true
     bgp_remote_asn     = "65001"
@@ -198,8 +216,8 @@ external_devices = {
   }
 
   "partner-network" = {
-    transit_gw_name    = "gcp-europe-transit"
-    connection_name    = "partner-vpn"
+    transit_gw_name    = "gcp-us-east-transit"
+    connection_name    = "external-infra-partner-vpn"
     remote_gateway_ip  = "198.51.100.50"
     bgp_enabled        = true
     bgp_remote_asn     = "65002"
@@ -224,12 +242,12 @@ spokes = [
   {
     vpc_name   = "app-vpc-1"
     project_id = "my-gcp-project"
-    ncc_hub    = "hub-us-east"
+    ncc_hub    = "hub-us-central"
   },
   {
     vpc_name   = "db-vpc-1"
     project_id = "my-gcp-project"
-    ncc_hub    = "hub-us-east"
+    ncc_hub    = "hub-us-central"
   }
 ]
 

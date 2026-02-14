@@ -664,9 +664,11 @@ resource "aviatrix_transit_external_device_conn" "external-1" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -687,9 +689,11 @@ resource "aviatrix_transit_external_device_conn" "external-2" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -710,9 +714,11 @@ resource "aviatrix_transit_external_device_conn" "external-3" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -733,9 +739,11 @@ resource "aviatrix_transit_external_device_conn" "external-4" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -756,9 +764,11 @@ resource "aviatrix_transit_external_device_conn" "external-5" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -779,9 +789,11 @@ resource "aviatrix_transit_external_device_conn" "external-6" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -802,9 +814,11 @@ resource "aviatrix_transit_external_device_conn" "external-7" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
@@ -825,9 +839,11 @@ resource "aviatrix_transit_external_device_conn" "external-8" {
   local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 1)}/29"
   remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 2)}/29"
   custom_algorithms           = false
-  phase1_local_identifier     = null
-  enable_jumbo_frame          = true
-  manual_bgp_advertised_cidrs = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  phase1_local_identifier       = null
+  enable_jumbo_frame            = true
+  manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
+  enable_learned_cidrs_approval = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false)
+  approved_cidrs                = try(var.transits[each.value.transit_key].tgw_connection_learned_cidr_approval[each.value.tgw_name], false) ? try(var.transits[each.value.transit_key].tgw_connection_approved_cidrs[each.value.tgw_name], []) : null
 
   lifecycle {
     ignore_changes = [backup_bgp_remote_as_num, backup_direct_connect, backup_remote_gateway_ip, disable_activemesh, ha_enabled, local_tunnel_cidr, remote_gateway_ip, remote_tunnel_cidr]
