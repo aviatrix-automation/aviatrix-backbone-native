@@ -398,6 +398,320 @@ output "domain_connectivity_graph" {
 }
 
 # ----------------------------------------------------------------------------
+# Table-Formatted Outputs (Human-Readable)
+# ----------------------------------------------------------------------------
+
+output "summary_table" {
+  description = "Concise summary table with key metrics"
+  value = join("\n", concat(
+    [
+      "",
+      "╔════════════════════════════════════════════════════════════════════╗",
+      "║              NETWORK SEGMENTATION SUMMARY                          ║",
+      "╠════════════════════════════════════════════════════════════════════╣",
+      "║                                                                    ║",
+      format("║  Domains:                    %3d                             ║", length(keys(aviatrix_segmentation_network_domain.domains))),
+      format("║  Connection Policies:        %3d                             ║", length(keys(aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy))),
+      format("║  Transit Associations:       %3d  (%3d auto, %2d manual)       ║",
+        length(keys(aviatrix_segmentation_network_domain_association.transit_domain_associations)),
+        length(keys(local.auto_transit_associations)),
+        length(keys(var.manual_transit_associations))
+      ),
+      format("║  Spoke Associations:         %3d  (%3d auto, %2d manual)       ║",
+        length(keys(aviatrix_segmentation_network_domain_association.spoke_domain_associations)),
+        length(keys(local.auto_spoke_associations)),
+        length(keys(var.manual_spoke_associations))
+      ),
+      format("║  Total Associations:         %3d                             ║",
+        length(keys(aviatrix_segmentation_network_domain_association.transit_domain_associations)) +
+        length(keys(aviatrix_segmentation_network_domain_association.spoke_domain_associations))
+      ),
+      "║                                                                    ║",
+      "╠════════════════════════════════════════════════════════════════════╣",
+      "║  DOMAINS                                                           ║",
+      "╠════════════════════════════════════════════════════════════════════╣",
+      "║  Domain          Transit  Spoke  Total  Connected To              ║",
+      "╟────────────────────────────────────────────────────────────────────╢"
+    ],
+    [
+      for domain in sort(keys(aviatrix_segmentation_network_domain.domains)) :
+      format("║  %-14s %5d  %5d  %5d  %-27s║",
+        substr(domain, 0, 14),
+        length([
+          for k, v in aviatrix_segmentation_network_domain_association.transit_domain_associations :
+          v if v.network_domain_name == domain
+        ]),
+        length([
+          for k, v in aviatrix_segmentation_network_domain_association.spoke_domain_associations :
+          v if v.network_domain_name == domain
+        ]),
+        (
+          length([
+            for k, v in aviatrix_segmentation_network_domain_association.transit_domain_associations :
+            v if v.network_domain_name == domain
+          ]) +
+          length([
+            for k, v in aviatrix_segmentation_network_domain_association.spoke_domain_associations :
+            v if v.network_domain_name == domain
+          ])
+        ),
+        substr(join(", ", [
+          for policy_key, policy in aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy :
+          policy.domain_name_1 == domain ? policy.domain_name_2 : policy.domain_name_2
+          if policy.domain_name_1 == domain || policy.domain_name_2 == domain
+        ]), 0, 27)
+      )
+    ],
+    [
+      "╚════════════════════════════════════════════════════════════════════╝",
+      ""
+    ]
+  ))
+}
+
+output "domain_summary_table" {
+  description = "Domain summary in table format for easy viewing"
+  value = join("\n", concat(
+    [
+      "",
+      "═════════════════════════════════════════════════════════════════════",
+      "                      DOMAIN SUMMARY TABLE",
+      "═════════════════════════════════════════════════════════════════════",
+      format("%-15s | %8s | %8s | %8s | %s", "Domain", "Transit", "Spoke", "Total", "Connected To"),
+      "─────────────────────────────────────────────────────────────────────"
+    ],
+    [
+      for domain in sort(keys(aviatrix_segmentation_network_domain.domains)) :
+      format("%-15s | %8d | %8d | %8d | %s",
+        domain,
+        length([
+          for k, v in aviatrix_segmentation_network_domain_association.transit_domain_associations :
+          v if v.network_domain_name == domain
+        ]),
+        length([
+          for k, v in aviatrix_segmentation_network_domain_association.spoke_domain_associations :
+          v if v.network_domain_name == domain
+        ]),
+        (
+          length([
+            for k, v in aviatrix_segmentation_network_domain_association.transit_domain_associations :
+            v if v.network_domain_name == domain
+          ]) +
+          length([
+            for k, v in aviatrix_segmentation_network_domain_association.spoke_domain_associations :
+            v if v.network_domain_name == domain
+          ])
+        ),
+        join(", ", [
+          for policy_key, policy in aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy :
+          policy.domain_name_1 == domain ? policy.domain_name_2 : policy.domain_name_2
+          if policy.domain_name_1 == domain || policy.domain_name_2 == domain
+        ])
+      )
+    ],
+    [
+      "═════════════════════════════════════════════════════════════════════",
+      ""
+    ]
+  ))
+}
+
+output "transit_associations_table" {
+  description = "Transit associations in table format for easy viewing"
+  value = join("\n", concat(
+    [
+      "",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      "                         TRANSIT ASSOCIATIONS TABLE",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      format("%-15s | %-30s | %-30s", "Domain", "Transit Gateway", "Connection"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    [
+      for k, v in aviatrix_segmentation_network_domain_association.transit_domain_associations :
+      format("%-15s | %-30s | %-30s",
+        v.network_domain_name,
+        v.transit_gateway_name,
+        v.attachment_name
+      )
+    ],
+    [
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      format("Total Transit Associations: %d", length(keys(aviatrix_segmentation_network_domain_association.transit_domain_associations))),
+      ""
+    ]
+  ))
+}
+
+output "spoke_associations_table" {
+  description = "Spoke associations in table format for easy viewing"
+  value = join("\n", concat(
+    [
+      "",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      "                          SPOKE ASSOCIATIONS TABLE",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      format("%-15s | %-30s | %-30s", "Domain", "Spoke Gateway", "Transit Gateway"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    [
+      for k, v in aviatrix_segmentation_network_domain_association.spoke_domain_associations :
+      format("%-15s | %-30s | %-30s",
+        v.network_domain_name,
+        v.attachment_name,
+        v.transit_gateway_name
+      )
+    ],
+    [
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      format("Total Spoke Associations: %d", length(keys(aviatrix_segmentation_network_domain_association.spoke_domain_associations))),
+      ""
+    ]
+  ))
+}
+
+output "connection_policy_table" {
+  description = "Connection policies in table format for easy viewing"
+  value = join("\n", concat(
+    [
+      "",
+      "═════════════════════════════════════════════════════════════",
+      "               CONNECTION POLICY TABLE",
+      "═════════════════════════════════════════════════════════════",
+      format("%-20s | %-20s | %s", "Domain 1", "Domain 2", "Status"),
+      "─────────────────────────────────────────────────────────────"
+    ],
+    [
+      for k, v in aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy :
+      format("%-20s | %-20s | %s",
+        v.domain_name_1,
+        v.domain_name_2,
+        "ALLOWED (bidirectional)"
+      )
+    ],
+    [
+      "═════════════════════════════════════════════════════════════",
+      format("Total Policies: %d", length(keys(aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy))),
+      ""
+    ]
+  ))
+}
+
+output "segmentation_status_table" {
+  description = "Segmentation status in table format for easy viewing"
+  value = join("\n", concat(
+    [
+      "",
+      "═══════════════════════════════════════════════════════════════",
+      "              SEGMENTATION STATUS REPORT",
+      "═══════════════════════════════════════════════════════════════",
+      "",
+      "DOMAINS:",
+      format("  Total Domains:           %d", length(keys(aviatrix_segmentation_network_domain.domains))),
+      format("  Domain Names:            %s", join(", ", sort(keys(aviatrix_segmentation_network_domain.domains)))),
+      "",
+      "POLICIES:",
+      format("  Total Policies:          %d", length(keys(aviatrix_segmentation_network_domain_connection_policy.segmentation_network_domain_connection_policy))),
+      "",
+      "ASSOCIATIONS:",
+      format("  Transit Associations:    %d", length(keys(aviatrix_segmentation_network_domain_association.transit_domain_associations))),
+      format("  Spoke Associations:      %d", length(keys(aviatrix_segmentation_network_domain_association.spoke_domain_associations))),
+      format("  Total Associations:      %d", (
+        length(keys(aviatrix_segmentation_network_domain_association.transit_domain_associations)) +
+        length(keys(aviatrix_segmentation_network_domain_association.spoke_domain_associations))
+      )),
+      "",
+      "ASSOCIATION SOURCES:",
+      format("  Auto-Inferred Transit:   %d", length(keys(local.auto_transit_associations))),
+      format("  Manual Transit:          %d", length(keys(var.manual_transit_associations))),
+      format("  Auto-Inferred Spoke:     %d", length(keys(local.auto_spoke_associations))),
+      format("  Manual Spoke:            %d", length(keys(var.manual_spoke_associations))),
+      "",
+      "EXCLUSIONS:",
+      format("  Excluded Connections:    %d", length(var.exclude_connections)),
+      format("  Excluded Spoke Gateways: %d", length(var.exclude_spoke_gateways)),
+      "",
+      "CONFIGURATION:",
+      format("  Spoke Cloud Types:       %s", join(", ", [for ct in var.spoke_cloud_types : tostring(ct)])),
+      "",
+      "═══════════════════════════════════════════════════════════════",
+      ""
+    ]
+  ))
+}
+
+output "association_sources_table" {
+  description = "Association sources (auto vs manual) in table format"
+  value = join("\n", concat(
+    [
+      "",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      "                        ASSOCIATION SOURCES TABLE",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      "",
+      "TRANSIT ASSOCIATIONS (Auto-Inferred):",
+      format("%-30s | %-20s | %-20s", "Connection~Gateway", "Domain", "Type"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    [
+      for key, assoc in local.auto_transit_associations :
+      format("%-30s | %-20s | %-20s",
+        substr(key, 0, 30),
+        assoc.network_domain,
+        "auto-inferred"
+      )
+    ],
+    [
+      "",
+      "TRANSIT ASSOCIATIONS (Manual):",
+      format("%-30s | %-20s | %-20s", "Connection~Gateway", "Domain", "Type"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    length(keys(var.manual_transit_associations)) > 0 ? [
+      for key, domain in var.manual_transit_associations :
+      format("%-30s | %-20s | %-20s",
+        substr(key, 0, 30),
+        domain,
+        "manual"
+      )
+    ] : ["  (none)"],
+    [
+      "",
+      "SPOKE ASSOCIATIONS (Auto-Inferred):",
+      format("%-30s | %-20s | %-20s", "Spoke~Transit", "Domain", "Type"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    [
+      for key, assoc in local.auto_spoke_associations :
+      format("%-30s | %-20s | %-20s",
+        substr(key, 0, 30),
+        assoc.network_domain,
+        "auto-inferred"
+      )
+    ],
+    [
+      "",
+      "SPOKE ASSOCIATIONS (Manual):",
+      format("%-30s | %-20s | %-20s", "Spoke~Transit", "Domain", "Type"),
+      "───────────────────────────────────────────────────────────────────────────────────"
+    ],
+    length(keys(var.manual_spoke_associations)) > 0 ? [
+      for key, domain in var.manual_spoke_associations :
+      format("%-30s | %-20s | %-20s",
+        substr(key, 0, 30),
+        domain,
+        "manual"
+      )
+    ] : ["  (none)"],
+    [
+      "",
+      "═══════════════════════════════════════════════════════════════════════════════════",
+      ""
+    ]
+  ))
+}
+
+# ----------------------------------------------------------------------------
 # Debug Outputs (optional, for troubleshooting)
 # ----------------------------------------------------------------------------
 

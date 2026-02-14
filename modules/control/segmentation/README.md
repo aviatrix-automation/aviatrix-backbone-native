@@ -206,6 +206,18 @@ terraform apply
 | `inferred_domain_mappings` | Auto-inferred domain mappings for connections and spokes |
 | `domain_connectivity_graph` | Graph representation of domain connectivity for visualization |
 
+### Table-Formatted Outputs (Human-Readable)
+
+| Name | Description |
+|------|-------------|
+| `summary_table` | **⭐ Primary** - Concise summary with key metrics in a beautiful box table |
+| `domain_summary_table` | Domain summary in ASCII table format - domains, counts, and connectivity |
+| `transit_associations_table` | Transit associations in ASCII table format |
+| `spoke_associations_table` | Spoke associations in ASCII table format |
+| `connection_policy_table` | Connection policies in ASCII table format |
+| `segmentation_status_table` | Complete status report in formatted text |
+| `association_sources_table` | Association sources (auto vs manual) in table format |
+
 ### Debug Outputs
 
 | Name | Description |
@@ -215,6 +227,33 @@ terraform apply
 | `debug_connections_list` | Debug: raw Site2Cloud connections list from API |
 
 **See [OUTPUTS_USAGE.md](./OUTPUTS_USAGE.md) for detailed examples and integration patterns.**
+
+### Viewing Table Outputs
+
+For beautiful, human-readable output:
+
+```bash
+# ⭐ View concise summary (recommended - best overview)
+terraform output -raw summary_table
+
+# View detailed domain summary table
+terraform output -raw domain_summary_table
+
+# View transit associations table
+terraform output -raw transit_associations_table
+
+# View spoke associations table
+terraform output -raw spoke_associations_table
+
+# View connection policies table
+terraform output -raw connection_policy_table
+
+# View complete status report
+terraform output -raw segmentation_status_table
+
+# View association sources (auto vs manual)
+terraform output -raw association_sources_table
+```
 
 ## Usage
 

@@ -2,6 +2,66 @@
 
 This document provides examples of how to use the segmentation module outputs.
 
+## Quick Start - Beautiful Table Outputs
+
+For immediate, human-readable output, use the table-formatted outputs:
+
+```bash
+# View complete status report (recommended starting point)
+terraform output -raw segmentation_status_table
+
+# View domain summary with counts
+terraform output -raw domain_summary_table
+
+# View all transit associations
+terraform output -raw transit_associations_table
+
+# View all spoke associations
+terraform output -raw spoke_associations_table
+
+# View connection policies
+terraform output -raw connection_policy_table
+
+# View association sources (auto-inferred vs manual)
+terraform output -raw association_sources_table
+```
+
+**Example Output:**
+```
+═══════════════════════════════════════════════════════════════
+              SEGMENTATION STATUS REPORT
+═══════════════════════════════════════════════════════════════
+
+DOMAINS:
+  Total Domains:           4
+  Domain Names:            dmz, infra, non-prod, prod
+
+POLICIES:
+  Total Policies:          5
+
+ASSOCIATIONS:
+  Transit Associations:    12
+  Spoke Associations:      8
+  Total Associations:      20
+
+ASSOCIATION SOURCES:
+  Auto-Inferred Transit:   10
+  Manual Transit:          2
+  Auto-Inferred Spoke:     7
+  Manual Spoke:            1
+
+EXCLUSIONS:
+  Excluded Connections:    2
+  Excluded Spoke Gateways: 1
+
+CONFIGURATION:
+  Spoke Cloud Types:       1, 8, 4
+
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
 ## Overview
 
 The segmentation module now exports comprehensive outputs that can be used for:
@@ -10,6 +70,7 @@ The segmentation module now exports comprehensive outputs that can be used for:
 - **Debugging**: Understand auto-inference vs manual associations
 - **Visualization**: Generate network topology diagrams
 - **Documentation**: Create segmentation policy reports
+- **Human-Readable Tables**: Beautiful ASCII tables for quick viewing
 
 ---
 
