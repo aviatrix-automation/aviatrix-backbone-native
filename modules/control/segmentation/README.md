@@ -228,9 +228,21 @@ terraform apply
 
 **See [OUTPUTS_USAGE.md](./OUTPUTS_USAGE.md) for detailed examples and integration patterns.**
 
-### Viewing Table Outputs
+### Quick View - Summary Table
 
-For beautiful, human-readable output:
+**Simplest way to see your segmentation status:**
+
+```bash
+# Option 1: Use the helper script
+./VIEW_SUMMARY.sh
+
+# Option 2: Direct command
+terraform output -raw summary_table
+```
+
+### Viewing Other Table Outputs
+
+For detailed views:
 
 ```bash
 # ⭐ View concise summary (recommended - best overview)
