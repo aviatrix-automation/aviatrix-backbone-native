@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.4.0...v0.5.0) (2026-02-14)
+
+
+### Features
+
+* add comprehensive example configs and DCF outputs ([#20](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/20)) ([50e152b](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/50e152b85e0305256a02b27c13b0431316967b39))
+* add comprehensive outputs to segmentation module ([#22](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/22)) ([9e7faf9](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/9e7faf9534afe46deb60a9b4e5865e54076b013a))
+
 ## [0.4.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.3.0...v0.4.0) (2026-01-29)
 
 
