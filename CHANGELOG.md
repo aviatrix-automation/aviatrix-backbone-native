@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.5.0...v0.6.0) (2026-02-14)
+
+
+### Features
+
+* add beautiful table output to peering module ([#23](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/23)) ([f40bbb7](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/f40bbb79ad7d47bfeec942cbfdceab6656a0fd12))
+
 ## [0.5.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.4.0...v0.5.0) (2026-02-14)
 
 
