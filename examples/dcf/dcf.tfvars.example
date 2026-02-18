@@ -35,14 +35,19 @@ distributed_firewalling_default_action_rule_logging = true
 #
 #   cidr       - match by IP CIDR block
 #   tags       - match VMs by tag key/value pairs
-#   s2c        - match one explicit Site2Cloud connection by name
+#   s2c        - match one or more explicit Site2Cloud connections by name
+#                (list of strings; each becomes a separate selector with OR logic)
 #   s2c_domain - auto-resolve all external-{domain}-* S2C connections
 #                (same naming convention as the segmentation module)
 #
-# s2c_domain fetches the connection list from the controller at apply time
-# and creates one selector per matching connection (OR logic). This means
-# a single "prod-remotes" smart group will match traffic from all prod S2C
-# connections without needing to list them explicitly.
+# When to use s2c vs s2c_domain:
+#   s2c        - use when connections have inconsistent names that don't follow
+#                the external-{domain}-* convention, or when you need explicit
+#                control over exactly which connections are included.
+#   s2c_domain - use when connections follow the naming convention. The module
+#                queries list_site2cloud at apply time and creates one selector
+#                per matching connection (OR logic), so new connections matching
+#                the pattern are picked up automatically on the next apply.
 
 smarties = {
   # ------------------------------------------------------------------
@@ -81,11 +86,17 @@ smarties = {
   }
 
   # ------------------------------------------------------------------
-  # S2C smart groups — explicit connection name
-  # Use when you need to target a single known connection.
+  # S2C smart groups — explicit connection list
+  # Use when connections have inconsistent names that don't follow the
+  # external-{domain}-* convention and can't be grouped by s2c_domain.
+  # A single connection is also valid: s2c = ["external-prod-chicago"]
   # ------------------------------------------------------------------
   "chicago-branch" = {
-    s2c = "external-prod-chicago"
+    s2c = ["external-prod-chicago"]
+  }
+
+  "partner-offices" = {
+    s2c = ["legacy-ny-branch", "partner-chicago-vpn"]
   }
 
   # ------------------------------------------------------------------
@@ -253,6 +264,10 @@ policies = {
 # Protocol options: "tcp", "udp", "icmp", "any"
 # ICMP must have an empty port_ranges list.
 
+# s2c vs s2c_domain:
+#   s2c        = ["conn-a", "conn-b"]   explicit list, any connection names
+#   s2c_domain = "prod"                 auto-resolves external-prod-* at apply time
+#
 # s2c_domain naming convention (same as segmentation module):
 #   Connection name must start with "external-" and contain the domain
 #   name anywhere after that prefix. Matching is case-insensitive.
