@@ -21,10 +21,18 @@ variable "distributed_firewalling_default_action_rule_logging" {
 variable "smarties" {
   description = "Map of smart groups to create"
   type = map(object({
-    cidr = optional(string)
-    tags = optional(map(string))
+    cidr       = optional(string)
+    tags       = optional(map(string))
+    s2c        = optional(string)
+    s2c_domain = optional(string)
   }))
   default = {}
+}
+
+variable "destroy_url" {
+  type        = string
+  description = "Dummy URL used by terracurl during destroy operations."
+  default     = "https://checkip.amazonaws.com"
 }
 
 variable "policies" {

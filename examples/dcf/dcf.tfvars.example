@@ -6,8 +6,8 @@
 #
 # Usage:
 #   terraform -chdir=modules/control/dcf init
-#   terraform -chdir=modules/control/dcf plan -var-file=../../dcf.tfvars
-#   terraform -chdir=modules/control/dcf apply -var-file=../../dcf.tfvars
+#   terraform -chdir=modules/control/dcf plan -var-file=../../../examples/dcf/dcf.tfvars
+#   terraform -chdir=modules/control/dcf apply -var-file=../../../examples/dcf/dcf.tfvars
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -21,24 +21,33 @@ aws_ssw_region = "us-east-1"
 # DCF Global Settings
 # ----------------------------------------------------------------------------
 
-# Enable or disable distributed firewalling globally
 enable_distributed_firewalling = true
 
-# Default action for traffic not matching any policy
-# Options: "PERMIT" or "DENY"
+# Default action for traffic not matching any policy: "PERMIT" or "DENY"
 distributed_firewalling_default_action_rule_action = "DENY"
 
-# Enable logging for default action rule
 distributed_firewalling_default_action_rule_logging = true
 
 # ----------------------------------------------------------------------------
 # Smart Groups
 # ----------------------------------------------------------------------------
-# Smart groups define collections of resources based on CIDR or VM tags
-# These can reference existing groups or create new ones
+# Each entry supports exactly one selector type:
+#
+#   cidr       - match by IP CIDR block
+#   tags       - match VMs by tag key/value pairs
+#   s2c        - match one explicit Site2Cloud connection by name
+#   s2c_domain - auto-resolve all external-{domain}-* S2C connections
+#                (same naming convention as the segmentation module)
+#
+# s2c_domain fetches the connection list from the controller at apply time
+# and creates one selector per matching connection (OR logic). This means
+# a single "prod-remotes" smart group will match traffic from all prod S2C
+# connections without needing to list them explicitly.
 
 smarties = {
-  # CIDR-based smart group
+  # ------------------------------------------------------------------
+  # CIDR-based smart groups
+  # ------------------------------------------------------------------
   "web-tier" = {
     cidr = "10.1.0.0/24"
   }
@@ -51,7 +60,13 @@ smarties = {
     cidr = "10.3.0.0/24"
   }
 
-  # Tag-based smart group (for VM/instance tags)
+  "mgmt-network" = {
+    cidr = "10.254.0.0/24"
+  }
+
+  # ------------------------------------------------------------------
+  # Tag-based smart groups (VM/instance tags)
+  # ------------------------------------------------------------------
   "prod-servers" = {
     tags = {
       "Environment" = "Production"
@@ -65,47 +80,83 @@ smarties = {
     }
   }
 
-  # DMZ zone
-  "dmz-zone" = {
-    cidr = "10.100.0.0/24"
+  # ------------------------------------------------------------------
+  # S2C smart groups — explicit connection name
+  # Use when you need to target a single known connection.
+  # ------------------------------------------------------------------
+  "chicago-branch" = {
+    s2c = "external-prod-chicago"
   }
 
-  # On-premises networks
-  "on-prem-dc1" = {
-    cidr = "172.16.0.0/16"
+  # ------------------------------------------------------------------
+  # S2C smart groups — domain-based auto-resolution
+  #
+  # The module queries list_site2cloud and matches all connections whose
+  # name starts with "external-" and contains the domain name after
+  # that prefix (case-insensitive substring match).
+  #
+  # Example: s2c_domain = "prod" matches:
+  #   - external-prod-chicago
+  #   - external-prod-newyork
+  #   - external-prod-london
+  # Each becomes a separate selector (OR logic) in the smart group.
+  # ------------------------------------------------------------------
+  "prod-remote-sites" = {
+    s2c_domain = "prod"
   }
 
-  "on-prem-dc2" = {
-    cidr = "172.17.0.0/16"
+  "dev-remote-sites" = {
+    s2c_domain = "dev"
   }
 
-  # Management network
-  "mgmt-network" = {
-    cidr = "10.254.0.0/24"
-  }
-
-  # External services
-  "external-partners" = {
-    cidr = "198.51.100.0/24"
+  "shared-services-remotes" = {
+    s2c_domain = "shared"
   }
 }
 
 # ----------------------------------------------------------------------------
 # Firewall Policies
 # ----------------------------------------------------------------------------
-# Define distributed firewall policies between smart groups
-# Policies are evaluated in priority order (lower number = higher priority)
+# Policies are evaluated in priority order (lower number = higher priority).
+# Smart group names reference keys from the smarties map above, or the name
+# of any pre-existing smart group on the controller.
 
 policies = {
   # =========================================================================
-  # Allow Rules (PERMIT)
+  # Critical Deny Rules  (priority 1-99)
+  # =========================================================================
+
+  "deny-dev-to-prod" = {
+    action           = "DENY"
+    priority         = 10
+    protocol         = "any"
+    logging          = true
+    watch            = true
+    src_smart_groups = ["dev-servers", "dev-remote-sites"]
+    dst_smart_groups = ["prod-servers", "prod-remote-sites"]
+    port_ranges      = []
+  }
+
+  "deny-remotes-to-db" = {
+    action           = "DENY"
+    priority         = 20
+    protocol         = "any"
+    logging          = true
+    watch            = true
+    src_smart_groups = ["prod-remote-sites", "dev-remote-sites"]
+    dst_smart_groups = ["db-tier"]
+    port_ranges      = []
+  }
+
+  # =========================================================================
+  # Core Allow Rules  (priority 100-199)
   # =========================================================================
 
   "allow-web-to-app" = {
     action           = "PERMIT"
     priority         = 100
     protocol         = "tcp"
-    logging          = true
+    logging          = false
     watch            = false
     src_smart_groups = ["web-tier"]
     dst_smart_groups = ["app-tier"]
@@ -120,148 +171,90 @@ policies = {
     watch            = false
     src_smart_groups = ["app-tier"]
     dst_smart_groups = ["db-tier"]
-    port_ranges      = ["3306", "5432"]  # MySQL, PostgreSQL
+    port_ranges      = ["3306", "5432"]
   }
 
-  "allow-mgmt-to-all" = {
-    action           = "PERMIT"
-    priority         = 50
-    protocol         = "tcp"
-    logging          = true
-    watch            = false
-    src_smart_groups = ["mgmt-network"]
-    dst_smart_groups = ["web-tier", "app-tier", "db-tier"]
-    port_ranges      = ["22", "3389"]  # SSH, RDP
-  }
-
-  "allow-prod-internal" = {
+  # S2C smart groups used like any other smart group in policies
+  "allow-prod-remotes-to-app" = {
     action           = "PERMIT"
     priority         = 120
-    protocol         = "any"
-    logging          = false
-    watch            = false
-    src_smart_groups = ["prod-servers"]
-    dst_smart_groups = ["prod-servers"]
-    port_ranges      = []
-  }
-
-  "allow-onprem-to-cloud" = {
-    action           = "PERMIT"
-    priority         = 150
     protocol         = "tcp"
     logging          = true
     watch            = false
-    src_smart_groups = ["on-prem-dc1", "on-prem-dc2"]
-    dst_smart_groups = ["app-tier", "db-tier"]
+    src_smart_groups = ["prod-remote-sites"]
+    dst_smart_groups = ["app-tier"]
     port_ranges      = ["443", "8443"]
   }
 
-  "allow-dmz-to-web" = {
+  "allow-chicago-branch-to-web" = {
     action           = "PERMIT"
     priority         = 130
     protocol         = "tcp"
     logging          = true
     watch            = false
-    src_smart_groups = ["dmz-zone"]
+    src_smart_groups = ["chicago-branch"]
     dst_smart_groups = ["web-tier"]
     port_ranges      = ["443"]
   }
 
-  # ICMP (ping) - no port ranges for ICMP protocol
-  "allow-icmp-monitoring" = {
+  # =========================================================================
+  # Management Rules  (priority 200-299)
+  # =========================================================================
+
+  "allow-mgmt-ssh-rdp" = {
     action           = "PERMIT"
     priority         = 200
+    protocol         = "tcp"
+    logging          = true
+    watch            = false
+    src_smart_groups = ["mgmt-network"]
+    dst_smart_groups = ["web-tier", "app-tier", "db-tier"]
+    port_ranges      = ["22", "3389"]
+  }
+
+  # ICMP has no port ranges
+  "allow-mgmt-icmp" = {
+    action           = "PERMIT"
+    priority         = 210
     protocol         = "icmp"
     logging          = false
     watch            = false
     src_smart_groups = ["mgmt-network"]
-    dst_smart_groups = ["web-tier", "app-tier", "db-tier"]
+    dst_smart_groups = ["web-tier", "app-tier", "db-tier", "prod-remote-sites"]
     port_ranges      = []
   }
 
   # =========================================================================
-  # Deny Rules (DENY)
+  # Watch / Monitor Rules  (priority 500+)
   # =========================================================================
 
-  "deny-external-to-db" = {
-    action           = "DENY"
-    priority         = 10
-    protocol         = "any"
-    logging          = true
-    watch            = true  # Enable watch mode for monitoring/alerting
-    src_smart_groups = ["external-partners", "dmz-zone"]
-    dst_smart_groups = ["db-tier"]
-    port_ranges      = []
-  }
-
-  "deny-dev-to-prod" = {
-    action           = "DENY"
-    priority         = 20
-    protocol         = "any"
-    logging          = true
-    watch            = true
-    src_smart_groups = ["dev-servers"]
-    dst_smart_groups = ["prod-servers"]
-    port_ranges      = []
-  }
-
-  "deny-internet-to-internal" = {
-    action           = "DENY"
-    priority         = 30
-    protocol         = "any"
-    logging          = true
-    watch            = true
-    src_smart_groups = ["external-partners"]
-    dst_smart_groups = ["app-tier", "db-tier", "mgmt-network"]
-    port_ranges      = []
-  }
-
-  # =========================================================================
-  # Watch Rules (for monitoring without enforcement)
-  # =========================================================================
-  # Set action to PERMIT but watch = true to monitor traffic patterns
-
-  "watch-unusual-db-access" = {
+  "watch-remote-to-db" = {
     action           = "PERMIT"
     priority         = 500
     protocol         = "tcp"
     logging          = true
-    watch            = true  # Monitor without blocking
-    src_smart_groups = ["web-tier"]
+    watch            = true
+    src_smart_groups = ["prod-remote-sites"]
     dst_smart_groups = ["db-tier"]
     port_ranges      = ["3306", "5432"]
   }
 }
 
 # ----------------------------------------------------------------------------
-# Notes and Best Practices
+# Notes
 # ----------------------------------------------------------------------------
 
-# Priority Guidelines:
-#   1-99   : Critical deny rules (security policies)
-#   100-199: Core allow rules (application flows)
-#   200-299: Secondary allow rules (monitoring, backups)
-#   300-399: Dev/Test environment rules
-#   400-499: Temporary/Testing rules
-#   500+   : Watch/Monitor rules
+# Priority guidelines:
+#   1-99   critical deny rules
+#   100-199 core application allow rules
+#   200-299 management and operational rules
+#   500+   watch/monitor rules (observe without enforcing)
 
-# Protocol Options:
-#   - "tcp", "udp", "icmp", "any"
-#   - ICMP does not use port_ranges
+# Protocol options: "tcp", "udp", "icmp", "any"
+# ICMP must have an empty port_ranges list.
 
-# Port Ranges:
-#   - Single port: ["443"]
-#   - Multiple ports: ["443", "8080", "8443"]
-#   - Port ranges not supported (use separate rules)
-#   - Empty list [] for "any" protocol or ICMP
-
-# Logging:
-#   - Enable for security policies and deny rules
-#   - Consider disabling for high-volume permit rules
-#   - Always enable for watch rules
-
-# Watch Mode:
-#   - Enables monitoring without enforcement
-#   - Useful for testing new policies
-#   - Generates logs and metrics
-#   - Can be used with PERMIT or DENY actions
+# s2c_domain naming convention (same as segmentation module):
+#   Connection name must start with "external-" and contain the domain
+#   name anywhere after that prefix. Matching is case-insensitive.
+#   Example connections matched by s2c_domain = "prod":
+#     external-prod-chicago, external-prod-london, external-prod-dr
