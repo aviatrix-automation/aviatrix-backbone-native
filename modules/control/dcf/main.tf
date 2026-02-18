@@ -99,7 +99,7 @@ resource "aviatrix_smart_group" "smarties" {
       }
     }
     dynamic "match_expressions" {
-      for_each = each.value.s2c != null ? [each.value.s2c] : []
+      for_each = each.value.s2c != null ? each.value.s2c : []
       content {
         s2c = match_expressions.value
       }

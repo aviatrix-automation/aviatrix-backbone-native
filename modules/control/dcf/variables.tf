@@ -23,7 +23,7 @@ variable "smarties" {
   type = map(object({
     cidr       = optional(string)
     tags       = optional(map(string))
-    s2c        = optional(string)
+    s2c        = optional(list(string))
     s2c_domain = optional(string)
   }))
   default = {}

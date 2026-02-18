@@ -16,7 +16,7 @@ Manages Aviatrix Distributed Cloud Firewall configuration, smart groups, and fir
 |-------|--------------|---------|
 | `cidr` | Match by CIDR block | `cidr = "10.1.0.0/24"` |
 | `tags` | Match VMs by tag map | `tags = { Env = "prod" }` |
-| `s2c` | Match one explicit S2C connection | `s2c = "external-prod-chicago"` |
+| `s2c` | Match one or more explicit S2C connections | `s2c = ["external-prod-chicago", "external-prod-dallas"]` |
 | `s2c_domain` | Auto-resolve all S2C connections for a domain | `s2c_domain = "prod"` |
 
 `s2c_domain` follows the same naming convention as the segmentation module: it matches any connection whose name starts with `external-` and contains the domain name after that prefix (case-insensitive substring match).
@@ -37,8 +37,8 @@ module "dcf" {
     "prod-remote-sites" = {
       s2c_domain = "prod"             # auto-resolves external-prod-* connections
     }
-    "specific-branch" = {
-      s2c = "external-prod-chicago"   # explicit connection name
+    "specific-branches" = {
+      s2c = ["external-prod-chicago", "external-prod-dallas"]  # explicit connection names
     }
     "web-tier" = {
       cidr = "10.1.0.0/24"
@@ -110,7 +110,7 @@ No modules.
 | <a name="input_enable_distributed_firewalling"></a> [enable\_distributed\_firewalling](#input\_enable\_distributed\_firewalling) | Enable or disable Distributed Cloud Firewall globally | `bool` | `false` | no |
 | <a name="input_distributed_firewalling_default_action_rule_action"></a> [distributed\_firewalling\_default\_action\_rule\_action](#input\_distributed\_firewalling\_default\_action\_rule\_action) | Default action for traffic that does not match any policy. `PERMIT` or `DENY` | `string` | `"DENY"` | no |
 | <a name="input_distributed_firewalling_default_action_rule_logging"></a> [distributed\_firewalling\_default\_action\_rule\_logging](#input\_distributed\_firewalling\_default\_action\_rule\_logging) | Enable logging for the default action rule | `bool` | `false` | no |
-| <a name="input_smarties"></a> [smarties](#input\_smarties) | Map of smart groups to create. Each entry supports one selector type: `cidr`, `tags`, `s2c`, or `s2c_domain` | <pre>map(object({<br/>    cidr       = optional(string)<br/>    tags       = optional(map(string))<br/>    s2c        = optional(string)<br/>    s2c_domain = optional(string)<br/>  }))</pre> | `{}` | no |
+| <a name="input_smarties"></a> [smarties](#input\_smarties) | Map of smart groups to create. Each entry supports one selector type: `cidr`, `tags`, `s2c`, or `s2c_domain` | <pre>map(object({<br/>    cidr       = optional(string)<br/>    tags       = optional(map(string))<br/>    s2c        = optional(list(string))<br/>    s2c_domain = optional(string)<br/>  }))</pre> | `{}` | no |
 | <a name="input_policies"></a> [policies](#input\_policies) | Map of distributed firewalling policies | <pre>map(object({<br/>    action           = string<br/>    priority         = number<br/>    protocol         = string<br/>    logging          = bool<br/>    watch            = bool<br/>    src_smart_groups = list(string)<br/>    dst_smart_groups = list(string)<br/>    port_ranges      = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_destroy_url"></a> [destroy\_url](#input\_destroy\_url) | Dummy URL used by terracurl during destroy operations | `string` | `"https://checkip.amazonaws.com"` | no |
 
