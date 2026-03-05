@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.6.0...v0.7.0) (2026-02-18)
+
+
+### Features
+
+* add S2C smart group selectors and domain auto-resolution to DCF module ([#25](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/25)) ([a1236d7](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/a1236d72b9428b492b7f7f1d8679452378d28df1))
+* support multiple explicit S2C connections per DCF smart group ([#27](https://github.com/aviatrix-automation/aviatrix-backbone-native/issues/27)) ([2a0e68a](https://github.com/aviatrix-automation/aviatrix-backbone-native/commit/2a0e68abcd6785c02bb232b1b32f5203c34d2fb5))
+
 ## [0.6.0](https://github.com/aviatrix-automation/aviatrix-backbone-native/compare/v0.5.0...v0.6.0) (2026-02-14)
 
 
