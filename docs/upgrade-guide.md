@@ -71,7 +71,7 @@ When upgrading the Aviatrix provider:
      required_providers {
        aviatrix = {
          source  = "AviatrixSystems/aviatrix"
-         version = "8.1.10"  # Update version
+         version = "8.2.00"  # Update version
        }
      }
    }

@@ -9,6 +9,7 @@
             <superuser>yes</superuser>
           </role-based>
         </permissions>
+        <public-key>${ssh_public_key}</public-key>
       </entry>
     </users>
     <password-complexity>
@@ -95,9 +96,8 @@
                 </lldp>
                 <dhcp-client>
                   <enable>yes</enable>
-                  <create-default-route>yes</create-default-route>
+                  <create-default-route>no</create-default-route>
                 </dhcp-client>
-                <interface-management-profile>WAN-HC-Profile</interface-management-profile>
               </layer3>
               <link-state>auto</link-state>
             </entry>
@@ -125,6 +125,20 @@
               <link-state>auto</link-state>
             </entry>
           </ethernet>
+%{ if length(ilb_vips) > 0 ~}
+          <loopback>
+            <units>
+%{ for i, vip in ilb_vips ~}
+              <entry name="loopback.${i + 1}">
+                <ip>
+                  <entry name="${vip}/32"/>
+                </ip>
+                <interface-management-profile>Main-Mgmt-Profile</interface-management-profile>
+              </entry>
+%{ endfor ~}
+            </units>
+          </loopback>
+%{ endif ~}
         </interface>
         <profiles>
           <monitor-profile>
@@ -139,12 +153,6 @@
               <http>no</http>
               <https>yes</https>
               <ssh>yes</ssh>
-              <ping>yes</ping>
-            </entry>
-            <entry name="WAN-HC-Profile">
-              <http>no</http>
-              <https>yes</https>
-              <ssh>no</ssh>
               <ping>yes</ping>
             </entry>
           </interface-management-profile>
@@ -276,7 +284,72 @@
             <interface>
               <member>ethernet1/1</member>
               <member>ethernet1/2</member>
+%{ for i, vip in ilb_vips ~}
+              <member>loopback.${i + 1}</member>
+%{ endfor ~}
             </interface>
+            <routing-table>
+              <ip>
+                <static-route>
+                  <entry name="default-route">
+                    <destination>0.0.0.0/0</destination>
+                    <interface>ethernet1/1</interface>
+                    <nexthop>
+                      <ip-address>${egress_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="rfc1918-10">
+                    <destination>10.0.0.0/8</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="rfc1918-172">
+                    <destination>172.16.0.0/12</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="rfc1918-192">
+                    <destination>192.168.0.0/16</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="google-hc-1">
+                    <destination>35.191.0.0/16</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="google-hc-2">
+                    <destination>130.211.0.0/22</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="google-hc-3">
+                    <destination>209.85.152.0/22</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                  <entry name="google-hc-4">
+                    <destination>209.85.204.0/22</destination>
+                    <interface>ethernet1/2</interface>
+                    <nexthop>
+                      <ip-address>${lan_gateway}</ip-address>
+                    </nexthop>
+                  </entry>
+                </static-route>
+              </ip>
+            </routing-table>
           </entry>
         </virtual-router>
       </network>
@@ -307,6 +380,7 @@
             <disable-telnet>yes</disable-telnet>
             <disable-http>yes</disable-http>
           </service>
+          <hostname>${hostname}</hostname>
         </system>
         <setting>
           <config>
@@ -315,6 +389,7 @@
           <management>
             <hostname-type-in-syslog>FQDN</hostname-type-in-syslog>
             <initcfg>
+              <public-key>${ssh_public_key}</public-key>
               <type>
                 <dhcp-client>
                   <send-hostname>yes</send-hostname>
@@ -323,6 +398,7 @@
                   <accept-dhcp-domain>no</accept-dhcp-domain>
                 </dhcp-client>
               </type>
+              <hostname>${hostname}</hostname>
               <dns-primary>8.8.8.8</dns-primary>
               <op-command-modes>mgmt-interface-swap</op-command-modes>
             </initcfg>
@@ -345,6 +421,9 @@
               <network>
                 <layer3>
                   <member>ethernet1/2</member>
+%{ for i, vip in ilb_vips ~}
+                  <member>loopback.${i + 1}</member>
+%{ endfor ~}
                 </layer3>
               </network>
             </entry>
@@ -356,21 +435,84 @@
             <entry name="Google-HC-2">
               <ip-netmask>130.211.0.0/22</ip-netmask>
             </entry>
+            <entry name="Google-HC-3">
+              <ip-netmask>209.85.152.0/22</ip-netmask>
+            </entry>
+            <entry name="Google-HC-4">
+              <ip-netmask>209.85.204.0/22</ip-netmask>
+            </entry>
+%{ for rule in external_lb_rules ~}
+            <entry name="elb-${rule.name}-dest">
+              <ip-netmask>${rule.destination_ip}/32</ip-netmask>
+            </entry>
+%{ endfor ~}
+%{ if fw_egress_ip != "" && length(external_lb_rules) > 0 ~}
+            <entry name="fw-egress-ip">
+              <ip-netmask>${fw_egress_ip}/32</ip-netmask>
+            </entry>
+%{ endif ~}
           </address>
           <address-group>
             <entry name="Google-Health-Checks">
               <static>
                 <member>Google-HC-1</member>
                 <member>Google-HC-2</member>
+                <member>Google-HC-3</member>
+                <member>Google-HC-4</member>
               </static>
             </entry>
           </address-group>
-          <service/>
+          <service>
+%{ for rule in external_lb_rules ~}
+            <entry name="svc-elb-${rule.name}">
+              <protocol>
+                <tcp>
+                  <port>${rule.frontend_port}</port>
+                </tcp>
+              </protocol>
+            </entry>
+%{ endfor ~}
+          </service>
           <service-group/>
           <schedule/>
           <rulebase>
             <security>
               <rules>
+%{ for rule in external_lb_rules ~}
+                <entry name="Allow-Inbound-${rule.name}">
+                  <to>
+                    <member>any</member>
+                  </to>
+                  <from>
+                    <member>WAN</member>
+                  </from>
+                  <source>
+                    <member>any</member>
+                  </source>
+                  <destination>
+                    <member>fw-egress-ip</member>
+                  </destination>
+                  <source-user>
+                    <member>any</member>
+                  </source-user>
+                  <category>
+                    <member>any</member>
+                  </category>
+                  <application>
+                    <member>any</member>
+                  </application>
+                  <service>
+                    <member>svc-elb-${rule.name}</member>
+                  </service>
+                  <hip-profiles>
+                    <member>any</member>
+                  </hip-profiles>
+                  <action>allow</action>
+                  <log-start>yes</log-start>
+                  <log-end>yes</log-end>
+                  <rule-type>universal</rule-type>
+                </entry>
+%{ endfor ~}
                 <entry name="Allow-Any-Out" uuid="10af1504-c2df-4727-9255-d97569424af3">
                   <to>
                     <member>WAN</member>
@@ -408,7 +550,35 @@
             </security>
             <nat>
               <rules>
-                <entry name="NAT-Out" uuid="a8cd9d64-84c5-4958-b4b6-faafb1e51c72">
+%{ for rule in external_lb_rules ~}
+                <entry name="DNAT-${rule.name}">
+                  <source-translation>
+                    <dynamic-ip-and-port>
+                      <interface-address>
+                        <interface>ethernet1/2</interface>
+                      </interface-address>
+                    </dynamic-ip-and-port>
+                  </source-translation>
+                  <destination-translation>
+                    <translated-address>elb-${rule.name}-dest</translated-address>
+                    <translated-port>${rule.backend_port}</translated-port>
+                  </destination-translation>
+                  <to>
+                    <member>any</member>
+                  </to>
+                  <from>
+                    <member>WAN</member>
+                  </from>
+                  <source>
+                    <member>any</member>
+                  </source>
+                  <destination>
+                    <member>fw-egress-ip</member>
+                  </destination>
+                  <service>svc-elb-${rule.name}</service>
+                </entry>
+%{ endfor ~}
+<entry name="NAT-Out" uuid="a8cd9d64-84c5-4958-b4b6-faafb1e51c72">
                   <source-translation>
                     <dynamic-ip-and-port>
                       <interface-address>
@@ -438,6 +608,9 @@
               <interface>
                 <member>ethernet1/1</member>
                 <member>ethernet1/2</member>
+%{ for i, vip in ilb_vips ~}
+                <member>loopback.${i + 1}</member>
+%{ endfor ~}
               </interface>
             </network>
           </import>

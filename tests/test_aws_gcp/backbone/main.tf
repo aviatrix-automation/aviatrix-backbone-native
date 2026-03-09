@@ -39,7 +39,7 @@ locals {
 # -----------------------------------------------------------------------------
 module "aws_transit" {
   source  = "terraform-aviatrix-modules/mc-transit/aviatrix"
-  version = "8.0.0"
+  version = "8.2.0"
   cloud   = "aws"
   name    = "${var.name_prefix}-aws-avx-transit"
   account = var.aviatrix_aws_access_account
@@ -56,7 +56,7 @@ module "aws_transit" {
 # -----------------------------------------------------------------------------
 module "gcp_transit" {
   source  = "terraform-aviatrix-modules/mc-transit/aviatrix"
-  version = "8.0.0"
+  version = "8.2.0"
   cloud   = "gcp"
   name    = "${var.name_prefix}-gcp-avx-transit"
   account = var.aviatrix_gcp_access_account
@@ -86,7 +86,7 @@ module "transit_peering" {
 # -----------------------------------------------------------------------------
 module "aws_spoke" {
   source   = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version  = "8.0.0"
+  version  = "8.2.0"
   for_each = local.aws_site_vpcs
 
   cloud   = "aws"
@@ -112,7 +112,7 @@ module "aws_spoke" {
 module "gcp_spoke" {
   count   = local.gcp_vpc_info != null ? 1 : 0
   source  = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version = "8.0.0"
+  version = "8.2.0"
 
   cloud   = "gcp"
   name    = "${var.name_prefix}-gcp-spoke"

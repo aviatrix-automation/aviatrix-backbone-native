@@ -1550,7 +1550,7 @@ Cross-Cloud:
 |-----------|---------|-------|
 | Terraform | >= 1.0 | Required |
 | Aviatrix Controller | 8.0+ | Minimum supported |
-| Aviatrix Provider | 8.1.20+ | Module version |
+| Aviatrix Provider | 8.2.0+ | Module version |
 | AWS Provider | >= 5.0 | For AWS modules |
 | Azure Provider | >= 3.0 | For Azure modules |
 | Google Provider | >= 4.0 | For GCP modules |

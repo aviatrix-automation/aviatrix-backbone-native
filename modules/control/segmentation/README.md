@@ -113,7 +113,7 @@ terraform apply
 | Name | Version |
 |------|---------|
 | terraform | >= 1.0 |
-| aviatrix | 8.1.1 |
+| aviatrix | 8.2.0 |
 | terracurl | 2.1.0 |
 | aws | >= 4.0 |
 | http | >= 3.0 |

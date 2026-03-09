@@ -187,7 +187,7 @@ locals {
 module "mc-transit" {
   for_each                      = var.transits
   source                        = "terraform-aviatrix-modules/mc-transit/aviatrix"
-  version                       = "8.0.0"
+  version                       = "8.2.0"
   account                       = each.value.account
   bgp_ecmp                      = true
   cloud                         = "aws"
@@ -944,7 +944,7 @@ module "mc-spoke" {
   depends_on = [module.mc-transit]
   for_each   = var.spokes
   source     = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version    = "8.0.0"
+  version    = "8.2.0"
 
   account                          = each.value.account
   attached                         = each.value.attached

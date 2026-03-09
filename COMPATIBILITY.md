@@ -14,12 +14,12 @@ This document outlines the version requirements and compatibility information fo
 
 | Module | Provider Version | Source |
 |--------|-----------------|--------|
-| aws | 8.1.1 | AviatrixSystems/aviatrix |
-| azure | 8.1.1 | AviatrixSystems/aviatrix |
-| gcp | 8.1.1 | AviatrixSystems/aviatrix |
-| peering | 8.1.10 | AviatrixSystems/aviatrix |
-| segmentation | 8.1.1 | AviatrixSystems/aviatrix |
-| dcf | 8.1.1 | AviatrixSystems/aviatrix |
+| aws | 8.2.0 | AviatrixSystems/aviatrix |
+| azure | 8.2.0 | AviatrixSystems/aviatrix |
+| gcp | 8.2.0 | AviatrixSystems/aviatrix |
+| peering | 8.2.0 | AviatrixSystems/aviatrix |
+| segmentation | 8.2.0 | AviatrixSystems/aviatrix |
+| dcf | 8.2.0 | AviatrixSystems/aviatrix |
 
 ### Cloud Provider Versions
 
@@ -33,7 +33,7 @@ This document outlines the version requirements and compatibility information fo
 
 | Provider | Version | Used By |
 |----------|---------|---------|
-| terracurl | 2.1.0 | segmentation |
+| terracurl | 2.1.0 | segmentation, dcf |
 
 ## Aviatrix Controller Compatibility
 
@@ -45,13 +45,17 @@ This document outlines the version requirements and compatibility information fo
 
 | Module | Dependency | Version |
 |--------|------------|---------|
-| controlplane | terraform-aviatrix-modules/aws-controlplane/aviatrix | 1.0.6 |
-| aws | terraform-aviatrix-modules/mc-transit | Latest |
-| aws | terraform-aviatrix-modules/mc-spoke | Latest |
-| azure | terraform-aviatrix-modules/mc-transit | Latest |
-| azure | terraform-aviatrix-modules/mc-spoke | Latest |
-| gcp | terraform-aviatrix-modules/mc-transit | Latest |
-| gcp | terraform-aviatrix-modules/mc-spoke | Latest |
+| controlplane | terraform-aviatrix-modules/aws-controlplane/aviatrix | 1.0.11 |
+| aws | terraform-aviatrix-modules/mc-transit/aviatrix | 8.2.0 |
+| aws | terraform-aviatrix-modules/mc-spoke/aviatrix | 8.2.0 |
+| aws | PaloAltoNetworks/swfw-modules/aws | 3.0.0-rc.1 |
+| azure | terraform-aviatrix-modules/mc-transit/aviatrix | 8.2.0 |
+| azure | terraform-aviatrix-modules/mc-spoke/aviatrix | 8.2.0 |
+| azure | PaloAltoNetworks/swfw-modules/azurerm | 3.4.5 |
+| gcp | terraform-aviatrix-modules/mc-transit/aviatrix | 8.2.0 |
+| gcp | terraform-aviatrix-modules/mc-spoke/aviatrix | 8.2.0 |
+| gcp | PaloAltoNetworks/swfw-modules/google | 2.0.11 |
+| peering | terraform-aviatrix-modules/mc-transit-peering/aviatrix | 1.0.9 |
 
 ## Cloud Platform Requirements
 

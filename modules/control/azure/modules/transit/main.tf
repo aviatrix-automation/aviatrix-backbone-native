@@ -477,7 +477,7 @@ resource "azurerm_virtual_hub_connection" "vnet_connection" {
 module "mc-transit" {
   for_each = var.transits
   source   = "terraform-aviatrix-modules/mc-transit/aviatrix"
-  version  = "8.0.0"
+  version  = "8.2.0"
 
   account                          = each.value.account
   az_support                       = false
@@ -679,7 +679,7 @@ module "bootstrap" {
 
 module "pan_fw" {
   source  = "PaloAltoNetworks/swfw-modules/azurerm//modules/vmseries"
-  version = "3.4.4"
+  version = "3.4.5"
 
   for_each = {
     for fw in local.fws :
@@ -860,7 +860,7 @@ resource "aviatrix_firewall_instance_association" "fw_associations" {
 module "mc-spoke" {
   for_each                         = var.spokes
   source                           = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version                          = "8.0.0"
+  version                          = "8.2.0"
   account                          = each.value.account
   az_support                       = false
   cloud                            = "azure"

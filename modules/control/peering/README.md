@@ -37,7 +37,7 @@ The module automatically discovers all transit gateways via the Aviatrix control
 | Name | Version |
 |------|---------|
 | terraform | >= 1.0 |
-| aviatrix | 8.1.20 |
+| aviatrix | 8.2.0 |
 | aws | >= 4.0 |
 
 ## Providers

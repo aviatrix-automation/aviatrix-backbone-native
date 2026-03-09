@@ -1,6 +1,6 @@
 module "control_plane" {
   source                    = "terraform-aviatrix-modules/aws-controlplane/aviatrix"
-  version                   = "1.0.6"
+  version                   = "1.0.11"
   controller_name           = var.controller_name
   copilot_name              = var.copilot_name
   incoming_ssl_cidrs        = var.incoming_ssl_cidrs
