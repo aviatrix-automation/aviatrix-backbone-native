@@ -2,14 +2,25 @@
 #
 # Configure PAN-OS firewall for GCP Aviatrix FireNet
 #
-# This script can be run after deployment to configure (or reconfigure) a
-# PAN-OS firewall. It is idempotent and safe to run multiple times. It also
-# cleans up legacy DNAT-based ILB health check rules if present.
+# This script configures a PAN-OS firewall with a single virtual router and a
+# PBF rule with enforce-symmetric-return for external load balancer traffic:
+#
+#   - default VR: ethernet1/1 (WAN) + ethernet1/2 (LAN) + loopbacks
+#     Routes: default → egress GW, RFC1918 → LAN GW, Google HC → LAN GW
+#
+#   - PBF rule (ELB-SYMRET): matches ingress on ethernet1/1, forwards to
+#     ethernet1/2 via LAN GW with enforce-symmetric-return via egress GW.
+#     This handles the asymmetric routing caused by the Global Application LB
+#     proxy (GFE) sourcing all traffic from 35.191.0.0/16 — the same prefix
+#     used by ILB health check routes. Without the PBF, return (s2c) traffic
+#     hits the 35.191 → LAN route, causing a zone mismatch drop.
 #
 # What it configures:
 #   - Hostname
 #   - Interface zones (WAN/LAN) and management profiles
-#   - Static routes (default via egress, RFC1918 + Google HC ranges via LAN)
+#   - Single virtual router (default) with all interfaces and routes
+#   - PBF rule with enforce-symmetric-return for external LB traffic
+#   - Static routes (default → WAN, RFC1918 → LAN, Google HC → LAN)
 #   - Loopback interfaces for ILB health checks (VIP IPs with mgmt profile)
 #   - External Application LB inbound NAT rules (DNAT to workload + SNAT via LAN interface)
 #   - NAT-Out rule (LAN→WAN source NAT)
@@ -154,11 +165,10 @@ ELB_ADDRESS_CMDS=""
 ELB_SERVICE_CMDS=""
 ELB_NAT_CMDS=""
 ELB_SECURITY_CMDS=""
+ELB_PBF_CMDS=""
 
 if [ ${#ELB_RULES[@]} -gt 0 ]; then
   # Clean up old ELB rules and objects before recreating (idempotent)
-  ELB_CLEANUP_CMDS+="delete rulebase pbf rules ELB-HC-Return
-"
   for RULE in "${ELB_RULES[@]}"; do
     IFS=':' read -r NAME FPORT BPORT DEST_IP <<< "${RULE}"
     ELB_CLEANUP_CMDS+="delete rulebase nat rules DNAT-${NAME}
@@ -167,8 +177,9 @@ delete address elb-${NAME}-dest
 delete service svc-elb-${NAME}
 "
   done
-  ELB_CLEANUP_CMDS+="delete address elb-public-ip
-delete address fw-egress-ip
+  ELB_CLEANUP_CMDS+="delete address fw-egress-ip
+delete rulebase pbf rules ELB-SYMRET
+delete rulebase pbf rules ELB-HC-Return
 "
 
   # Address object for FW egress IP (DNAT destination match — Application LB sends to this IP)
@@ -184,9 +195,9 @@ delete address fw-egress-ip
     # Service object for frontend port
     ELB_SERVICE_CMDS+="set service svc-elb-${NAME} protocol tcp port ${FPORT}
 "
-    # DNAT + SNAT rule (to any — SNAT session table handles return path)
+    # DNAT + SNAT rule (to WAN — pre-NAT dst is FW's own egress IP on WAN zone)
     ELB_NAT_CMDS+="set rulebase nat rules DNAT-${NAME} from WAN
-set rulebase nat rules DNAT-${NAME} to any
+set rulebase nat rules DNAT-${NAME} to WAN
 set rulebase nat rules DNAT-${NAME} source any
 set rulebase nat rules DNAT-${NAME} destination fw-egress-ip
 set rulebase nat rules DNAT-${NAME} service svc-elb-${NAME}
@@ -208,16 +219,18 @@ set rulebase security rules Allow-Inbound-${NAME} action allow
 "
   done
 
-  # PBF rule: force DNAT'd return traffic (from workloads via LAN) destined to
-  # Google HC ranges back out WAN. Without this, the static routes for 35.191.0.0/16
-  # etc. (needed for ILB HC) would send return traffic back into LAN.
-  ELB_SECURITY_CMDS+="set rulebase pbf rules ELB-HC-Return from LAN
-set rulebase pbf rules ELB-HC-Return source any
-set rulebase pbf rules ELB-HC-Return destination Google-Health-Checks
-set rulebase pbf rules ELB-HC-Return action forward egress-interface ethernet1/1 nexthop ip-address ${EGRESS_GW}
-set rulebase pbf rules ELB-HC-Return action forward monitor disable no
+  # PBF rule: enforce-symmetric-return for all traffic ingressing ethernet1/1
+  # c2s: forward to LAN GW via ethernet1/2 (aligns with DNAT routing to workload)
+  # s2c: symmetric return forces traffic back out ethernet1/1 via egress GW MAC
+  ELB_PBF_CMDS+="set rulebase pbf rules ELB-SYMRET from interface ethernet1/1
+set rulebase pbf rules ELB-SYMRET source any
+set rulebase pbf rules ELB-SYMRET destination any
+set rulebase pbf rules ELB-SYMRET service any
+set rulebase pbf rules ELB-SYMRET action forward egress-interface ethernet1/2
+set rulebase pbf rules ELB-SYMRET action forward nexthop ip-address ${LAN_GW}
+set rulebase pbf rules ELB-SYMRET enforce-symmetric-return enabled yes
+set rulebase pbf rules ELB-SYMRET enforce-symmetric-return nexthop-address-list ${EGRESS_GW}
 "
-
 fi
 
 # Build the full PAN-OS configuration command block
@@ -238,11 +251,16 @@ set network profiles interface-management-profile Main-Mgmt-Profile ping yes ssh
 delete network interface ethernet ethernet1/1 layer3 interface-management-profile
 set network interface ethernet ethernet1/2 layer3 interface-management-profile Main-Mgmt-Profile
 
-# --- Virtual Router & Interfaces ---
+# --- Single Virtual Router ---
+# Delete old dual VRs if present (migration from dual-VRF config)
+delete network virtual-router external-vr
+delete network virtual-router internal-vr
+
+# Single VR with all interfaces
 set network virtual-router default interface ethernet1/1
 set network virtual-router default interface ethernet1/2
 
-# --- Static Routes ---
+# Routes: default → WAN, RFC1918 → LAN, Google HC → LAN (for ILB health checks)
 set network virtual-router default routing-table ip static-route default-route destination 0.0.0.0/0 interface ethernet1/1 nexthop ip-address ${EGRESS_GW}
 set network virtual-router default routing-table ip static-route rfc1918-10 destination 10.0.0.0/8 interface ethernet1/2 nexthop ip-address ${LAN_GW}
 set network virtual-router default routing-table ip static-route rfc1918-172 destination 172.16.0.0/12 interface ethernet1/2 nexthop ip-address ${LAN_GW}
@@ -285,6 +303,8 @@ ${ELB_SERVICE_CMDS}
 ${ELB_NAT_CMDS}
 # --- ELB Inbound Security Rules ---
 ${ELB_SECURITY_CMDS}
+# --- ELB PBF Rule (enforce-symmetric-return) ---
+${ELB_PBF_CMDS}
 # --- Security Rule ---
 delete rulebase security rules Allow-Any-Out
 set rulebase security rules Allow-Any-Out from LAN
