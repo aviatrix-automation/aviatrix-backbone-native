@@ -49,14 +49,14 @@ data "google_compute_subnetwork" "existing_bgp_lan_subnets" {
   for_each = { for pair in flatten([
     for transit in var.transits : [
       for intf_type, subnet_config in transit.bgp_lan_subnets : {
-        gw_name             = transit.gw_name
-        project_id          = transit.project_id
-        region              = transit.region
+        gw_name              = transit.gw_name
+        project_id           = transit.project_id
+        region               = transit.region
         existing_subnet_name = subnet_config.existing_subnet_name
-        intf_type           = intf_type
+        intf_type            = intf_type
       } if subnet_config.existing_subnet_name != null &&
-           subnet_config.existing_subnet_name != "" &&
-           !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      subnet_config.existing_subnet_name != "" &&
+      !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -76,7 +76,7 @@ data "google_compute_router" "existing_bgp_lan_routers" {
         intf_type  = intf_type
         vpc_name   = [for hub in var.ncc_hubs : hub.existing_vpc_name if hub.name == intf_type && !hub.create][0]
       } if subnet_config.cidr != "" &&
-           !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
 
@@ -106,7 +106,7 @@ data "google_compute_address" "existing_bgp_lan_addresses" {
           type       = "ha"
         }
       ] if subnet != "" &&
-           !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
+      !contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}-${pair.type}" => pair }
 

@@ -56,25 +56,72 @@ module "transit" {
       }
       manual_bgp_advertised_cidrs = ["0.0.0.0/0"]
       tgw_connection_cidrs = {
-        "prod"     = ["10.1.0.0/16", "10.2.0.0/16"]
-        "non-prod" = ["10.3.0.0/16"]
+        "prod"     = ["0.0.0.0/0"]
+        "non-prod" = ["0.0.0.0/0"]
       }
       # Gateway-level: Enable connection-based learned CIDR approval mode
       learned_cidr_approval       = "false" # Must be false for connection mode
       learned_cidrs_approval_mode = "connection"
       # Per-connection learned CIDR approval configuration
       tgw_connection_learned_cidr_approval = {
-        "prod"     = true
-        "non-prod" = true
+        "prod"     = false
+        "non-prod" = false
       }
       tgw_connection_approved_cidrs = {
         "prod"     = []
         "non-prod" = []
       }
-      mgmt_source_ranges   = ["10.0.0.0/8"]
-      egress_source_ranges = ["10.0.0.0/8"]
-      lan_source_ranges    = ["10.0.0.0/8"]
-    }
+      mgmt_source_ranges   = ["0.0.0.0/0"]
+      egress_source_ranges = ["0.0.0.0/0"]
+      lan_source_ranges    = ["0.0.0.0/0"]
+    },
+    # aws-tr-prod-2 = {
+    #   account                = "lab-test-aws"
+    #   cidr                   = "13.0.0.0/23"
+    #   instance_size          = "c5n.9xlarge"
+    #   local_as_number        = 65013
+    #   fw_amount              = 0
+    #   firewall_image         = "6njl1pau431dv1qxipg63mvah"
+    #   firewall_image_version = "12.1.3-h2"
+    #   tgw_name               = "ai-1"
+    #   inside_cidr_blocks = {
+    #     "ai-1" = {
+    #       connect_peer_1    = "169.254.121.0/29"
+    #       ha_connect_peer_1 = "169.254.221.0/29"
+    #       connect_peer_2    = "169.254.122.0/29"
+    #       ha_connect_peer_2 = "169.254.222.0/29"
+    #       connect_peer_3    = "169.254.123.0/29"
+    #       ha_connect_peer_3 = "169.254.223.0/29"
+    #       connect_peer_4    = "169.254.124.0/29"
+    #       ha_connect_peer_4 = "169.254.224.0/29"
+    #       connect_peer_5    = "169.254.125.0/29"
+    #       ha_connect_peer_5 = "169.254.225.0/29"
+    #       connect_peer_6    = "169.254.126.0/29"
+    #       ha_connect_peer_6 = "169.254.226.0/29"
+    #       connect_peer_7    = "169.254.127.0/29"
+    #       ha_connect_peer_7 = "169.254.227.0/29"
+    #       connect_peer_8    = "169.254.128.0/29"
+    #       ha_connect_peer_8 = "169.254.228.0/29"
+    #     }
+    #   }
+    #   manual_bgp_advertised_cidrs = ["0.0.0.0/0"]
+    #   tgw_connection_cidrs = {
+    #     "ai-1" = ["0.0.0.0/0"]
+    #   }
+    #   # Gateway-level: Enable connection-based learned CIDR approval mode
+    #   learned_cidr_approval       = "false" # Must be false for connection mode
+    #   learned_cidrs_approval_mode = "connection"
+    #   # Per-connection learned CIDR approval configuration
+    #   tgw_connection_learned_cidr_approval = {
+    #     "ai-1" = false
+    #   }
+    #   tgw_connection_approved_cidrs = {
+    #     "ai-1" = []
+    #   }
+    #   mgmt_source_ranges   = ["0.0.0.0/0"]
+    #   egress_source_ranges = ["0.0.0.0/0"]
+    #   lan_source_ranges    = ["0.0.0.0/0"]
+    # }
   }
   tgws = {
     prod = {
@@ -86,6 +133,12 @@ module "transit" {
     non-prod = {
       amazon_side_asn             = 64522
       transit_gateway_cidr_blocks = ["172.32.0.0/24"]
+      create_tgw                  = true
+      account_ids                 = []
+    },
+    ai-1 = {
+      amazon_side_asn             = 64532
+      transit_gateway_cidr_blocks = ["172.64.0.0/24"]
       create_tgw                  = true
       account_ids                 = []
     }

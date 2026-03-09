@@ -10,6 +10,17 @@ Manages Aviatrix Distributed Cloud Firewall configuration, smart groups, and fir
 - Reference both newly created and pre-existing smart groups in firewall policies
 - Per-policy control of protocol, port ranges, logging, and watch mode
 
+## Important Note (Terraform 8.2.0)
+
+In Terraform `8.2.0`, when rules are created with the new MWP `aviatrix_dcf_ruleset` resources, adding or deleting a rule can cause Terraform to re-order and re-create the entire ruleset.
+
+Workaround: set the following values on **all rules**:
+
+- `log_profile = "def000ad-7000-0000-0000-000000000001"` (log on start only)
+- `tls_profile = ""`
+
+This workaround prevents a full ruleset diff and ensures Terraform only shows changes for rules that were actually changed.
+
 ## Smart Group Selector Types
 
 | Field | Selector Type | Example |
@@ -67,14 +78,14 @@ module "dcf" {
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_aviatrix"></a> [aviatrix](#requirement\_aviatrix) | 8.1.1 |
+| <a name="requirement_aviatrix"></a> [aviatrix](#requirement\_aviatrix) | 8.2.0 |
 | <a name="requirement_terracurl"></a> [terracurl](#requirement\_terracurl) | 2.1.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aviatrix"></a> [aviatrix](#provider\_aviatrix) | 8.1.1 |
+| <a name="provider_aviatrix"></a> [aviatrix](#provider\_aviatrix) | 8.2.0 |
 | <a name="provider_aws.ssm"></a> [aws.ssm](#provider\_aws.ssm) | >= 5.0 |
 | <a name="provider_http"></a> [http](#provider\_http) | >= 3.0 |
 | <a name="provider_terracurl"></a> [terracurl](#provider\_terracurl) | 2.1.0 |
@@ -89,12 +100,12 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [aviatrix_distributed_firewalling_config.enable_distributed_firewalling](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.1.1/docs/resources/distributed_firewalling_config) | resource |
-| [aviatrix_distributed_firewalling_default_action_rule.distributed_firewalling_default_action_rule](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.1.1/docs/resources/distributed_firewalling_default_action_rule) | resource |
-| [aviatrix_distributed_firewalling_policy_list.policies](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.1.1/docs/resources/distributed_firewalling_policy_list) | resource |
-| [aviatrix_smart_group.smarties](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.1.1/docs/resources/smart_group) | resource |
+| [aviatrix_distributed_firewalling_config.enable_distributed_firewalling](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.2.0/docs/resources/distributed_firewalling_config) | resource |
+| [aviatrix_distributed_firewalling_default_action_rule.distributed_firewalling_default_action_rule](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.2.0/docs/resources/distributed_firewalling_default_action_rule) | resource |
+| [aviatrix_distributed_firewalling_policy_list.policies](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.2.0/docs/resources/distributed_firewalling_policy_list) | resource |
+| [aviatrix_smart_group.smarties](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.2.0/docs/resources/smart_group) | resource |
 | [terracurl_request.s2c_connections](https://registry.terraform.io/providers/devops-rob/terracurl/latest/docs/resources/request) | resource |
-| [aviatrix_smart_groups.foo](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.1.1/docs/data-sources/smart_groups) | data source |
+| [aviatrix_smart_groups.foo](https://registry.terraform.io/providers/AviatrixSystems/aviatrix/8.2.0/docs/data-sources/smart_groups) | data source |
 | [aws_ssm_parameter.aviatrix_ip](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ssm_parameter) | data source |
 | [aws_ssm_parameter.aviatrix_password](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ssm_parameter) | data source |
 | [aws_ssm_parameter.aviatrix_username](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ssm_parameter) | data source |

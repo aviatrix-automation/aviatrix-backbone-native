@@ -15,16 +15,16 @@ variable "project_id" {
 
 variable "transits" {
   type = list(object({
-    gw_name                     = string
-    project_id                  = string
-    region                      = string
-    name                        = string
-    vpc_cidr                    = string
-    gw_size                     = string
-    access_account_name         = string
-    cloud_router_asn            = number
-    aviatrix_gw_asn             = number
-    bgp_lan_subnets             = map(object({
+    gw_name             = string
+    project_id          = string
+    region              = string
+    name                = string
+    vpc_cidr            = string
+    gw_size             = string
+    access_account_name = string
+    cloud_router_asn    = number
+    aviatrix_gw_asn     = number
+    bgp_lan_subnets = map(object({
       cidr                 = string           # CIDR for new subnet or validation for existing
       existing_subnet_name = optional(string) # Name of existing subnet (when NCC hub create = false)
     }))
@@ -42,18 +42,34 @@ variable "transits" {
     bgp_lan_connection_learned_cidr_approval = optional(map(bool), {})
     bgp_lan_connection_approved_cidrs        = optional(map(set(string)), {})
     inspection_enabled                       = optional(bool, false)
-    egress_enabled              = optional(bool, true)
-    zone                        = optional(string, "")
-    ha_zone                     = optional(string, "")
-    ssh_keys                    = optional(string, "admin:")
-    source_ranges               = optional(set(string), ["0.0.0.0/0"])
-    service_account             = optional(string, "")
-    name_prefix                 = optional(string, "paloaltonetworks-firewall-bootstrap-")
-    files                       = optional(map(string), {})
+    egress_enabled                           = optional(bool, true)
+    zone                                     = optional(string, "")
+    ha_zone                                  = optional(string, "")
+    ssh_keys                                 = optional(string, "admin:")
+    source_ranges                            = optional(set(string), ["0.0.0.0/0"])
+    service_account                          = optional(string, "")
+    name_prefix                              = optional(string, "paloaltonetworks-firewall-bootstrap-")
+    files                                    = optional(map(string), {})
     # Learned CIDRs approval configuration
     learned_cidr_approval       = optional(string, "false")
     learned_cidrs_approval_mode = optional(string, null)
     approved_learned_cidrs      = optional(list(string), null)
+    # External load balancer NAT rules — each rule creates a DNAT+SNAT path through the PAN firewalls
+    # to an internal workload. One rule must have health_check = true (ELB HC probes the workload through the FW).
+    external_lb_rules = optional(list(object({
+      name           = string # Rule identifier (used in resource/PAN-OS object names)
+      frontend_port  = number # Port on the ELB (client-facing)
+      backend_port   = number # Port on the workload (DNAT destination port)
+      destination_ip = string # Workload IP (DNAT destination address)
+      health_check   = optional(bool, false)
+    })), [])
+    # Firewall IP configuration for automated bootstrap
+    # When set, static IPs are assigned and bootstrap.xml is rendered per-firewall
+    # Auto-populated with defaults when fw_amount > 0
+    fw_ip_config = optional(object({
+      egress_ip_start = optional(number, 4) # cidrhost offset for first FW in egress subnet
+      lan_ip_start    = optional(number, 4) # cidrhost offset for first FW in LAN subnet
+    }), null)
   }))
   validation {
     condition = alltrue([
@@ -105,6 +121,32 @@ variable "transits" {
       t.aviatrix_gw_asn >= 64512 && t.aviatrix_gw_asn <= 65534 && t.aviatrix_gw_asn != t.cloud_router_asn
     ])
     error_message = "aviatrix_gw_asn must be a private ASN between 64512 and 65534 and must not match cloud_router_asn."
+  }
+  validation {
+    condition = alltrue([
+      for t in var.transits : length(t.external_lb_rules) == 0 || t.fw_amount > 0
+    ])
+    error_message = "external_lb_rules requires fw_amount > 0 (firewalls must exist to serve as backends)."
+  }
+  validation {
+    condition = alltrue([
+      for t in var.transits : length(t.external_lb_rules) == 0 || length([for r in t.external_lb_rules : r if r.health_check]) == 1
+    ])
+    error_message = "Exactly one external_lb_rules entry must have health_check = true."
+  }
+  validation {
+    condition = alltrue([
+      for t in var.transits : length(t.external_lb_rules) == length(distinct([for r in t.external_lb_rules : r.name]))
+    ])
+    error_message = "external_lb_rules names must be unique within a transit."
+  }
+  validation {
+    condition = alltrue([
+      for t in var.transits : alltrue([
+        for r in t.external_lb_rules : r.frontend_port >= 1 && r.frontend_port <= 65535 && r.backend_port >= 1 && r.backend_port <= 65535
+      ])
+    ])
+    error_message = "external_lb_rules frontend_port and backend_port must be between 1 and 65535."
   }
 }
 
@@ -163,7 +205,7 @@ variable "ncc_hubs" {
     preset_topology = optional(string, "STAR")
     # For existing VPC (when create = false)
     existing_vpc_name    = optional(string)
-    existing_vpc_project = optional(string)  # Defaults to project_id if not specified
+    existing_vpc_project = optional(string) # Defaults to project_id if not specified
   }))
   default = []
 
@@ -200,16 +242,16 @@ variable "external_devices" {
     enable_ikev2              = optional(bool)
     inspected_by_firenet      = bool
     # Custom IPsec algorithm parameters
-    custom_algorithms         = optional(bool, false)
-    pre_shared_key            = optional(string)
-    backup_pre_shared_key     = optional(string)
-    phase_1_authentication    = optional(string)
-    phase_1_dh_groups         = optional(string)
-    phase_1_encryption        = optional(string)
-    phase_2_authentication    = optional(string)
-    phase_2_dh_groups         = optional(string)
-    phase_2_encryption        = optional(string)
-    phase1_local_identifier   = optional(string)
+    custom_algorithms       = optional(bool, false)
+    pre_shared_key          = optional(string)
+    backup_pre_shared_key   = optional(string)
+    phase_1_authentication  = optional(string)
+    phase_1_dh_groups       = optional(string)
+    phase_1_encryption      = optional(string)
+    phase_2_authentication  = optional(string)
+    phase_2_dh_groups       = optional(string)
+    phase_2_encryption      = optional(string)
+    phase1_local_identifier = optional(string)
     # BGP learned CIDRs and manual advertisement parameters
     enable_learned_cidrs_approval = optional(bool, false)
     approved_cidrs                = optional(set(string))

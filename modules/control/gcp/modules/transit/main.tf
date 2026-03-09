@@ -1,6 +1,44 @@
 locals {
+  # Normalize transits: auto-populate fw_ip_config with defaults when fw_amount > 0
+  # This ensures all firewalls get static IPs, bootstrap template rendering, routes, and loopbacks
+  transits_normalized = [
+    for t in var.transits : merge(t, {
+      fw_ip_config = t.fw_ip_config != null ? t.fw_ip_config : (
+        t.fw_amount > 0 ? {
+          egress_ip_start = 4
+          lan_ip_start    = 4
+        } : null
+      )
+    })
+  ]
+
+  transits_map = { for t in local.transits_normalized : t.gw_name => t }
+
+  # Transits that need an external LB in front of FW egress interfaces
+  lb_external_transits = { for t in local.transits_normalized : t.gw_name => t if length(t.external_lb_rules) > 0 && t.fw_amount > 0 }
+
+  # Health check rule per transit (the one rule with health_check = true)
+  lb_external_hc_rule = {
+    for t in local.transits_normalized : t.gw_name => [for r in t.external_lb_rules : r if r.health_check][0]
+    if length(t.external_lb_rules) > 0
+  }
+
+  # Flat map of per-rule entries for forwarding rules: {gw_name}-{rule_name} => { ... }
+  lb_external_rules_flat = merge([
+    for gw_name, t in local.lb_external_transits : {
+      for rule in t.external_lb_rules :
+      "${gw_name}-${rule.name}" => {
+        gw_name       = gw_name
+        project_id    = t.project_id
+        region        = t.region
+        rule_name     = rule.name
+        frontend_port = rule.frontend_port
+      }
+    }
+  ]...)
+
   bgp_lan_subnets_order = {
-    for transit in var.transits :
+    for transit in local.transits_normalized :
     transit.gw_name => keys(transit.bgp_lan_subnets)
   }
 
@@ -35,7 +73,7 @@ locals {
   }
 
   fws = flatten([
-    for transit in var.transits : concat(
+    for transit in local.transits_normalized : concat(
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         gw_name                = transit.gw_name
         index                  = i
@@ -51,6 +89,14 @@ locals {
         ssh_keys               = transit.ssh_keys
         name_prefix            = transit.name_prefix
         files                  = transit.files
+        # Static IP assignments (null when fw_ip_config is not set)
+        egress_ip = transit.fw_ip_config != null ? cidrhost(transit.egress_cidr, transit.fw_ip_config.egress_ip_start + i * 2) : null
+        lan_ip    = transit.fw_ip_config != null ? cidrhost(transit.lan_cidr, transit.fw_ip_config.lan_ip_start + i * 2) : null
+        # Bootstrap template config
+        fw_ip_config      = transit.fw_ip_config
+        egress_cidr       = transit.egress_cidr
+        lan_cidr          = transit.lan_cidr
+        external_lb_rules = transit.external_lb_rules
       }],
       [for i in range(floor(tonumber(transit.fw_amount) / 2)) : {
         gw_name                = transit.gw_name
@@ -67,12 +113,20 @@ locals {
         ssh_keys               = transit.ssh_keys
         name_prefix            = transit.name_prefix
         files                  = transit.files
+        # Static IP assignments (null when fw_ip_config is not set)
+        egress_ip = transit.fw_ip_config != null ? cidrhost(transit.egress_cidr, transit.fw_ip_config.egress_ip_start + i * 2 + 1) : null
+        lan_ip    = transit.fw_ip_config != null ? cidrhost(transit.lan_cidr, transit.fw_ip_config.lan_ip_start + i * 2 + 1) : null
+        # Bootstrap template config
+        fw_ip_config      = transit.fw_ip_config
+        egress_cidr       = transit.egress_cidr
+        lan_cidr          = transit.lan_cidr
+        external_lb_rules = transit.external_lb_rules
       }]
     )
   ])
 
   inspection_policies = flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet_config in transit.bgp_lan_subnets : {
         transit_key     = transit.gw_name
         connection_name = "external-${intf_type}-${transit.gw_name}"
@@ -100,16 +154,16 @@ locals {
       enable_ikev2              = v.enable_ikev2
       inspected_by_firenet      = v.inspected_by_firenet
       # Custom IPsec algorithm parameters
-      custom_algorithms         = v.custom_algorithms
-      pre_shared_key            = v.pre_shared_key
-      backup_pre_shared_key     = v.backup_pre_shared_key
-      phase_1_authentication    = v.phase_1_authentication
-      phase_1_dh_groups         = v.phase_1_dh_groups
-      phase_1_encryption        = v.phase_1_encryption
-      phase_2_authentication    = v.phase_2_authentication
-      phase_2_dh_groups         = v.phase_2_dh_groups
-      phase_2_encryption        = v.phase_2_encryption
-      phase1_local_identifier   = v.phase1_local_identifier
+      custom_algorithms       = v.custom_algorithms
+      pre_shared_key          = v.pre_shared_key
+      backup_pre_shared_key   = v.backup_pre_shared_key
+      phase_1_authentication  = v.phase_1_authentication
+      phase_1_dh_groups       = v.phase_1_dh_groups
+      phase_1_encryption      = v.phase_1_encryption
+      phase_2_authentication  = v.phase_2_authentication
+      phase_2_dh_groups       = v.phase_2_dh_groups
+      phase_2_encryption      = v.phase_2_encryption
+      phase1_local_identifier = v.phase1_local_identifier
       # BGP learned CIDRs and manual advertisement parameters
       enable_learned_cidrs_approval = v.enable_learned_cidrs_approval
       approved_cidrs                = v.approved_cidrs
@@ -122,8 +176,8 @@ locals {
       transit_key     = v.transit_gw_name
       connection_name = v.connection_name
       pair_key        = v.pair_key
-    } if v.inspected_by_firenet && lookup(
-      { for t in var.transits : t.gw_name => t.fw_amount },
+      } if v.inspected_by_firenet && lookup(
+      { for t in local.transits_normalized : t.gw_name => t.fw_amount },
       v.transit_gw_name,
       0
     ) > 0
@@ -153,7 +207,7 @@ resource "google_network_connectivity_group" "center_group" {
 
   auto_accept {
     auto_accept_projects = distinct([
-      for transit in var.transits : transit.project_id
+      for transit in local.transits_normalized : transit.project_id
       if contains(keys(transit.bgp_lan_subnets), each.key)
     ])
   }
@@ -191,7 +245,7 @@ resource "google_network_connectivity_group" "default_group" {
 
   auto_accept {
     auto_accept_projects = distinct(flatten([
-      [for transit in var.transits : transit.project_id if contains(keys(transit.bgp_lan_subnets), each.key)],
+      [for transit in local.transits_normalized : transit.project_id if contains(keys(transit.bgp_lan_subnets), each.key)],
       [for spoke in var.spokes : spoke.project_id if spoke.ncc_hub == each.key]
     ]))
   }
@@ -203,7 +257,7 @@ resource "google_network_connectivity_group" "default_group" {
 
 resource "google_network_connectivity_spoke" "avx_spokes_star" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
@@ -252,7 +306,7 @@ resource "google_network_connectivity_spoke" "avx_spokes_star" {
 
 resource "google_network_connectivity_spoke" "avx_spokes_mesh" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
@@ -360,7 +414,7 @@ resource "google_compute_network" "bgp_lan_vpcs" {
 
 resource "google_compute_subnetwork" "bgp_lan_subnets" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet_config in transit.bgp_lan_subnets : {
         gw_name       = transit.gw_name
         project_id    = transit.project_id
@@ -386,14 +440,16 @@ resource "google_compute_subnetwork" "bgp_lan_subnets" {
 
 resource "google_compute_router" "bgp_lan_routers" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet_config in transit.bgp_lan_subnets : {
-        gw_name    = transit.gw_name
-        project_id = transit.project_id
-        region     = transit.region
-        subnet_config = subnet_config
-        intf_type  = intf_type
-        asn        = transit.cloud_router_asn
+        gw_name         = transit.gw_name
+        project_id      = transit.project_id
+        region          = transit.region
+        subnet_config   = subnet_config
+        intf_type       = intf_type
+        asn             = transit.cloud_router_asn
+        has_external_lb = length(transit.external_lb_rules) > 0
+        lan_cidr        = transit.lan_cidr
       } if subnet_config.cidr != "" && contains([for hub in var.ncc_hubs : hub.name if hub.create], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
@@ -404,7 +460,15 @@ resource "google_compute_router" "bgp_lan_routers" {
   network = local.bgp_lan_vpcs[each.value.intf_type].self_link
 
   bgp {
-    asn = each.value.asn
+    asn            = each.value.asn
+    advertise_mode = each.value.has_external_lb ? "CUSTOM" : "DEFAULT"
+
+    dynamic "advertised_ip_ranges" {
+      for_each = each.value.has_external_lb ? [each.value.lan_cidr] : []
+      content {
+        range = advertised_ip_ranges.value
+      }
+    }
   }
 
   depends_on = [
@@ -415,7 +479,7 @@ resource "google_compute_router" "bgp_lan_routers" {
 
 resource "google_compute_address" "bgp_lan_addresses" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : [
         {
           gw_name    = transit.gw_name
@@ -451,7 +515,7 @@ resource "google_compute_address" "bgp_lan_addresses" {
 
 resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
@@ -483,7 +547,7 @@ resource "google_compute_router_interface" "bgp_lan_interfaces_pri" {
 
 resource "google_compute_router_interface" "bgp_lan_interfaces_ha" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name    = transit.gw_name
         project_id = transit.project_id
@@ -535,10 +599,10 @@ resource "google_compute_firewall" "bgp_lan_bgp" {
 }
 
 module "mc_transit" {
-  for_each = { for transit in var.transits : transit.gw_name => transit }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit }
 
   source  = "terraform-aviatrix-modules/mc-transit/aviatrix"
-  version = "8.0.0"
+  version = "8.2.0"
 
   cloud                         = "gcp"
   region                        = each.value.region
@@ -585,7 +649,7 @@ module "mc_transit" {
 }
 
 resource "google_compute_network" "mgmt_vpcs" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.mgmt_cidr != "" }
 
   name                    = "${each.value.name}-mgmt-vpc"
   project                 = each.value.project_id
@@ -594,7 +658,7 @@ resource "google_compute_network" "mgmt_vpcs" {
 }
 
 resource "google_compute_subnetwork" "mgmt_subnets" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.mgmt_cidr != "" }
 
   name          = "${each.value.name}-mgmt-subnet"
   project       = each.value.project_id
@@ -609,7 +673,7 @@ resource "google_compute_subnetwork" "mgmt_subnets" {
 }
 
 resource "google_compute_network" "egress_vpcs" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.egress_cidr != "" }
 
   name                    = "${each.value.name}-egress-vpc"
   project                 = each.value.project_id
@@ -618,7 +682,7 @@ resource "google_compute_network" "egress_vpcs" {
 }
 
 resource "google_compute_subnetwork" "egress_subnets" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.egress_cidr != "" }
 
   name          = "${each.value.name}-egress-subnet"
   project       = each.value.project_id
@@ -633,7 +697,7 @@ resource "google_compute_subnetwork" "egress_subnets" {
 }
 
 resource "google_compute_firewall" "mgmt_firewall_rules" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.mgmt_cidr != "" }
 
   name    = "${each.key}-mgmt-allow"
   project = each.value.project_id
@@ -648,7 +712,7 @@ resource "google_compute_firewall" "mgmt_firewall_rules" {
 
 
 resource "google_compute_firewall" "egress_firewall_rules" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.egress_cidr != "" }
 
   name    = "${each.key}-egress-allow"
   project = each.value.project_id
@@ -668,7 +732,32 @@ module "swfw-modules_bootstrap" {
   location        = each.value.region
   name_prefix     = each.value.name_prefix
   service_account = each.value.service_account
-  files           = each.value.files
+  # When fw_ip_config is set, exclude bootstrap.xml from files (we upload a rendered template instead)
+  files = each.value.fw_ip_config != null ? {
+    for k, v in each.value.files : k => v if v != "config/bootstrap.xml"
+  } : each.value.files
+}
+
+# Upload per-firewall rendered bootstrap.xml when fw_ip_config is configured
+resource "google_storage_bucket_object" "bootstrap_xml" {
+  for_each = {
+    for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw
+    if fw.fw_ip_config != null
+  }
+
+  name   = "config/bootstrap.xml"
+  bucket = module.swfw-modules_bootstrap[each.key].bucket_name
+  content = templatefile("${path.module}/../../bootstrap/bootstrap.xml.tftpl", {
+    hostname          = each.key
+    ssh_public_key    = can(regex("^[^:]+:(.*)", each.value.ssh_keys)) ? regex("^[^:]+:(.*)", each.value.ssh_keys)[0] : each.value.ssh_keys
+    egress_gateway    = cidrhost(each.value.egress_cidr, 1)
+    lan_gateway       = cidrhost(each.value.lan_cidr, 1)
+    ilb_vips          = [cidrhost(each.value.lan_cidr, 99), cidrhost(each.value.lan_cidr, 100)]
+    external_lb_rules = each.value.external_lb_rules
+    fw_egress_ip      = each.value.egress_ip
+  })
+
+  depends_on = [module.swfw-modules_bootstrap]
 }
 
 module "pan_fw" {
@@ -683,9 +772,9 @@ module "pan_fw" {
   project = each.value.project_id
   zone    = each.value.zone
 
-  name         = each.key
-  custom_image = "${each.value.firewall_image}-${each.value.firewall_image_version}"
-  machine_type = each.value.fw_instance_size
+  name           = each.key
+  vmseries_image = "${each.value.firewall_image}-${each.value.firewall_image_version}"
+  machine_type   = each.value.fw_instance_size
 
   bootstrap_options = {
     type                                 = "dhcp-client"
@@ -697,6 +786,7 @@ module "pan_fw" {
   network_interfaces = [
     {
       subnetwork       = google_compute_subnetwork.egress_subnets[each.value.gw_name].self_link
+      private_ip       = each.value.egress_ip
       create_public_ip = true
     },
     {
@@ -705,6 +795,7 @@ module "pan_fw" {
     },
     {
       subnetwork       = data.google_compute_subnetwork.lan_subnetwork[each.value.name].self_link
+      private_ip       = each.value.lan_ip
       create_public_ip = false
     }
   ]
@@ -726,7 +817,7 @@ module "pan_fw" {
 }
 
 resource "aviatrix_firenet" "firenet" {
-  for_each = { for transit in var.transits : transit.gw_name => transit if transit.fw_amount > 0 }
+  for_each = { for transit in local.transits_normalized : transit.gw_name => transit if transit.fw_amount > 0 }
 
   vpc_id             = module.mc_transit[each.key].vpc.vpc_id
   inspection_enabled = each.value.inspection_enabled
@@ -734,7 +825,7 @@ resource "aviatrix_firenet" "firenet" {
 }
 
 resource "aviatrix_firewall_instance_association" "fw_associations" {
-  for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if var.transits[fw.gw_name].attach_firewall }
+  for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if local.transits_map[fw.gw_name].attach_firewall }
 
   vpc_id               = module.mc_transit[each.value.gw_name].vpc.vpc_id
   firenet_gw_name      = each.value.type == "pri" ? module.mc_transit[each.value.gw_name].transit_gateway.gw_name : module.mc_transit[each.value.gw_name].transit_gateway.ha_gw_name
@@ -752,9 +843,10 @@ resource "aviatrix_firewall_instance_association" "fw_associations" {
   ]
 }
 
+
 resource "google_compute_router_peer" "bgp_lan_peers_pri" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name      = transit.gw_name
         project_id   = transit.project_id
@@ -780,13 +872,15 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri" {
     google_compute_router.bgp_lan_routers,
     data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
-    module.mc_transit
+    module.mc_transit,
+    google_network_connectivity_spoke.avx_spokes_star,
+    google_network_connectivity_spoke.avx_spokes_mesh,
   ]
 }
 
 resource "google_compute_router_peer" "bgp_lan_peers_ha" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name      = transit.gw_name
         project_id   = transit.project_id
@@ -812,13 +906,15 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha" {
     google_compute_router.bgp_lan_routers,
     data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
-    module.mc_transit
+    module.mc_transit,
+    google_network_connectivity_spoke.avx_spokes_star,
+    google_network_connectivity_spoke.avx_spokes_mesh,
   ]
 }
 
 resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name      = transit.gw_name
         project_id   = transit.project_id
@@ -844,13 +940,15 @@ resource "google_compute_router_peer" "bgp_lan_peers_pri_to_ha" {
     google_compute_router.bgp_lan_routers,
     data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_ha,
-    module.mc_transit
+    module.mc_transit,
+    google_network_connectivity_spoke.avx_spokes_star,
+    google_network_connectivity_spoke.avx_spokes_mesh,
   ]
 }
 
 resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
         gw_name      = transit.gw_name
         project_id   = transit.project_id
@@ -876,22 +974,24 @@ resource "google_compute_router_peer" "bgp_lan_peers_ha_to_pri" {
     google_compute_router.bgp_lan_routers,
     data.google_compute_router.existing_bgp_lan_routers,
     google_compute_router_interface.bgp_lan_interfaces_pri,
-    module.mc_transit
+    module.mc_transit,
+    google_network_connectivity_spoke.avx_spokes_star,
+    google_network_connectivity_spoke.avx_spokes_mesh,
   ]
 }
 
 resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   for_each = { for pair in flatten([
-    for transit in var.transits : [
+    for transit in local.transits_normalized : [
       for intf_type, subnet in transit.bgp_lan_subnets : {
-        gw_name                           = transit.gw_name
-        project_id                        = transit.project_id
-        region                            = transit.region
-        subnet                            = subnet
-        intf_type                         = intf_type
-        manual_bgp_advertised_cidrs       = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
-        enable_learned_cidrs_approval     = try(transit.bgp_lan_connection_learned_cidr_approval[intf_type], false)
-        approved_cidrs                    = try(transit.bgp_lan_connection_approved_cidrs[intf_type], [])
+        gw_name                       = transit.gw_name
+        project_id                    = transit.project_id
+        region                        = transit.region
+        subnet                        = subnet
+        intf_type                     = intf_type
+        manual_bgp_advertised_cidrs   = try(transit.bgp_lan_connection_cidrs[intf_type], transit.manual_bgp_advertised_cidrs)
+        enable_learned_cidrs_approval = try(transit.bgp_lan_connection_learned_cidr_approval[intf_type], false)
+        approved_cidrs                = try(transit.bgp_lan_connection_approved_cidrs[intf_type], [])
       } if subnet != "" && contains([for hub in var.ncc_hubs : hub.name], intf_type)
     ]
   ]) : "${pair.gw_name}-bgp-lan-${pair.intf_type}" => pair }
@@ -900,15 +1000,15 @@ resource "aviatrix_transit_external_device_conn" "bgp_lan_connections" {
   gw_name                   = each.value.gw_name
   connection_type           = "bgp"
   tunnel_protocol           = "LAN"
-  bgp_local_as_num          = [for t in var.transits : t.aviatrix_gw_asn if t.gw_name == each.value.gw_name][0]
-  bgp_remote_as_num         = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
+  bgp_local_as_num          = [for t in local.transits_normalized : t.aviatrix_gw_asn if t.gw_name == each.value.gw_name][0]
+  bgp_remote_as_num         = [for t in local.transits_normalized : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
   remote_lan_ip             = local.bgp_lan_addresses["${each.key}-pri"].address
   local_lan_ip              = module.mc_transit[each.value.gw_name].transit_gateway.bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
   ha_enabled                = true
-  backup_bgp_remote_as_num  = [for t in var.transits : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
+  backup_bgp_remote_as_num  = [for t in local.transits_normalized : t.cloud_router_asn if t.gw_name == each.value.gw_name][0]
   backup_remote_lan_ip      = local.bgp_lan_addresses["${each.key}-ha"].address
-  backup_local_lan_ip           = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
-  enable_bgp_lan_activemesh     = true
+  backup_local_lan_ip       = module.mc_transit[each.value.gw_name].transit_gateway.ha_bgp_lan_ip_list[index(local.bgp_lan_subnets_order[each.value.gw_name], each.value.intf_type)]
+  enable_bgp_lan_activemesh = true
 
   manual_bgp_advertised_cidrs   = each.value.manual_bgp_advertised_cidrs
   enable_learned_cidrs_approval = each.value.enable_learned_cidrs_approval
@@ -941,16 +1041,16 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
   enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
   # Custom IPsec algorithm support - only set when custom_algorithms is true
-  custom_algorithms         = each.value.custom_algorithms
-  pre_shared_key            = each.value.pre_shared_key
-  backup_pre_shared_key     = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
-  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
-  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
-  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
-  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
-  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
-  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
-  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
+  custom_algorithms       = each.value.custom_algorithms
+  pre_shared_key          = each.value.pre_shared_key
+  backup_pre_shared_key   = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
+  phase_1_authentication  = each.value.custom_algorithms ? each.value.phase_1_authentication : null
+  phase_1_dh_groups       = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
+  phase_1_encryption      = each.value.custom_algorithms ? each.value.phase_1_encryption : null
+  phase_2_authentication  = each.value.custom_algorithms ? each.value.phase_2_authentication : null
+  phase_2_dh_groups       = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
+  phase_2_encryption      = each.value.custom_algorithms ? each.value.phase_2_encryption : null
+  phase1_local_identifier = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
   # BGP learned CIDRs and manual advertisement support - only set when bgp_enabled is true
   enable_learned_cidrs_approval = each.value.bgp_enabled ? each.value.enable_learned_cidrs_approval : null
   approved_cidrs                = each.value.bgp_enabled && each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null
@@ -966,7 +1066,7 @@ resource "aviatrix_transit_firenet_policy" "inspection_policies" {
     for p in concat(local.inspection_policies, local.external_inspection_policies) :
     p.pair_key => p
     if lookup(
-      { for t in var.transits : t.gw_name => t.inspection_enabled },
+      { for t in local.transits_normalized : t.gw_name => t.inspection_enabled },
       p.transit_key,
       false
     )
@@ -987,7 +1087,7 @@ module "mc-spoke" {
   depends_on = [module.mc_transit]
   for_each   = var.aviatrix_spokes
   source     = "terraform-aviatrix-modules/mc-spoke/aviatrix"
-  version    = "8.0.0"
+  version    = "8.2.0"
 
   account                          = each.value.account
   attached                         = each.value.attached
@@ -1007,4 +1107,107 @@ module "mc-spoke" {
   eip              = each.value.eip
   ha_eip           = each.value.ha_eip
   single_ip_snat   = each.value.single_ip_snat
+}
+
+# Global External Application LB fronting PAN firewall public IPs via Internet NEGs.
+# Uses INTERNET_IP_PORT NEGs so GFE communicates with FW backends via the public internet,
+# avoiding routing conflicts with internal Google HC ranges (35.191.0.0/16) used by ILB.
+# PAN-OS receives traffic with dst = its own egress NIC IP (GCP 1:1 NAT from public IP).
+# DNAT rewrites the destination to the real backend before PAN-OS classifies it as host traffic.
+
+resource "google_compute_health_check" "ext_lb" {
+  for_each = local.lb_external_transits
+
+  name    = "${each.value.gw_name}-ext-lb-hc"
+  project = each.value.project_id
+
+  http_health_check {
+    port = local.lb_external_hc_rule[each.key].frontend_port
+  }
+}
+
+# One Internet NEG per firewall (Internet NEGs support only 1 endpoint each)
+resource "google_compute_global_network_endpoint_group" "ext_lb" {
+  for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if lookup(local.lb_external_transits, fw.gw_name, null) != null }
+
+  name                  = "${each.key}-ext-lb-neg"
+  project               = each.value.project_id
+  network_endpoint_type = "INTERNET_IP_PORT"
+  default_port          = local.lb_external_hc_rule[each.value.gw_name].frontend_port
+}
+
+resource "google_compute_global_network_endpoint" "ext_lb" {
+  for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if lookup(local.lb_external_transits, fw.gw_name, null) != null }
+
+  project                       = each.value.project_id
+  global_network_endpoint_group = google_compute_global_network_endpoint_group.ext_lb[each.key].id
+  ip_address                    = module.pan_fw[each.key].instance.network_interface[0].access_config[0].nat_ip
+  port                          = local.lb_external_hc_rule[each.value.gw_name].frontend_port
+
+  depends_on = [module.pan_fw]
+}
+
+resource "google_compute_backend_service" "ext_lb" {
+  for_each = local.lb_external_transits
+
+  name    = "${each.value.gw_name}-ext-lb"
+  project = each.value.project_id
+
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTP"
+  health_checks         = [google_compute_health_check.ext_lb[each.key].self_link]
+  session_affinity      = "CLIENT_IP"
+
+  dynamic "backend" {
+    for_each = {
+      for fw_key, fw in { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if fw.gw_name == each.key } :
+      fw_key => fw
+    }
+    content {
+      group                 = google_compute_global_network_endpoint_group.ext_lb[backend.key].self_link
+      balancing_mode        = "RATE"
+      max_rate_per_endpoint = 1000
+      capacity_scaler       = 1.0
+    }
+  }
+
+  depends_on = [
+    google_compute_global_network_endpoint.ext_lb,
+  ]
+}
+
+resource "google_compute_url_map" "ext_lb" {
+  for_each = local.lb_external_transits
+
+  name            = "${each.value.gw_name}-ext-lb"
+  project         = each.value.project_id
+  default_service = google_compute_backend_service.ext_lb[each.key].self_link
+}
+
+resource "google_compute_target_http_proxy" "ext_lb" {
+  for_each = local.lb_external_transits
+
+  name    = "${each.value.gw_name}-ext-lb"
+  project = each.value.project_id
+  url_map = google_compute_url_map.ext_lb[each.key].self_link
+}
+
+resource "google_compute_global_address" "ext_lb" {
+  for_each = local.lb_external_transits
+
+  name         = "${each.value.gw_name}-ext-lb"
+  project      = each.value.project_id
+  address_type = "EXTERNAL"
+}
+
+resource "google_compute_global_forwarding_rule" "ext_lb" {
+  for_each = local.lb_external_rules_flat
+
+  name    = "${each.value.gw_name}-ext-lb-${each.value.rule_name}"
+  project = each.value.project_id
+
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  target                = google_compute_target_http_proxy.ext_lb[each.value.gw_name].self_link
+  ip_address            = google_compute_global_address.ext_lb[each.value.gw_name].address
+  port_range            = each.value.frontend_port
 }
