@@ -1548,20 +1548,20 @@ Cross-Cloud:
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Terraform | >= 1.0 | Required |
-| Aviatrix Controller | 8.0+ | Minimum supported |
-| Aviatrix Provider | 8.2.0+ | Module version |
-| AWS Provider | >= 5.0 | For AWS modules |
-| Azure Provider | >= 3.0 | For Azure modules |
-| Google Provider | >= 4.0 | For GCP modules |
+| Terraform | >= 1.3 | Required |
+| Aviatrix Controller | 8.2+ | Minimum supported |
+| Aviatrix Provider | ~> 8.2 | Module version |
+| AWS Provider | ~> 5.0 | For AWS modules |
+| Azure Provider | ~> 3.0 | For Azure modules |
+| Google Provider | ~> 5.0 | For GCP modules |
 
 ---
 
 ## Document Version
 
-- **Version**: 1.1
-- **Last Updated**: January 2026
-- **Module Version**: 0.3.0+
+- **Version**: 1.2
+- **Last Updated**: March 2026
+- **Module Version**: 0.8.0+
 - **Contributors**: Ricardo Trentin, Claude Sonnet 4.5
 
 ---
@@ -1574,4 +1574,4 @@ Cross-Cloud:
 
 ---
 
-*This document covers all supported use cases for the Aviatrix Backbone Native modules as of January 2026.*
+*This document covers all supported use cases for the Aviatrix Backbone Native modules as of March 2026.*
