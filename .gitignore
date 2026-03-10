@@ -39,6 +39,11 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Private keys and secrets
+*.pem
+.env
+.env.*
+
 # Claude Code documentation (anywhere in repo)
 **/CLAUDE.md
 CLAUDE.md
