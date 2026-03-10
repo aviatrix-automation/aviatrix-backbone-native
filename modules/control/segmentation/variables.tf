@@ -1,5 +1,5 @@
 
-variable "aws_ssw_region" {
+variable "aws_ssm_region" {
   description = "AWS SSM region for parameter retrieval."
   type        = string
 }
@@ -12,6 +12,7 @@ variable "domains" {
 
 
 variable "connection_policy" {
+  description = "List of connection policies defining allowed domain-to-domain communication."
   type = list(object({
     source = string
     target = string

@@ -822,6 +822,10 @@ resource "aviatrix_firenet" "firenet" {
   vpc_id             = module.mc_transit[each.key].vpc.vpc_id
   inspection_enabled = each.value.inspection_enabled
   egress_enabled     = each.value.egress_enabled
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aviatrix_firewall_instance_association" "fw_associations" {

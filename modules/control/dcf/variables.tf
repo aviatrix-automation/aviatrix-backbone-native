@@ -1,25 +1,28 @@
-variable "aws_ssw_region" {
-  type = string
+variable "aws_ssm_region" {
+  description = "AWS SSM region for parameter retrieval."
+  type        = string
 }
 
 variable "enable_distributed_firewalling" {
-  type    = bool
-  default = false
+  description = "Enable or disable Distributed Cloud Firewall globally."
+  type        = bool
+  default     = false
 }
 
 variable "distributed_firewalling_default_action_rule_action" {
-  type    = string
-  default = "DENY"
-
+  description = "Default action for traffic that does not match any policy. PERMIT or DENY."
+  type        = string
+  default     = "DENY"
 }
+
 variable "distributed_firewalling_default_action_rule_logging" {
-  type    = bool
-  default = false
+  description = "Enable logging for the default action rule."
+  type        = bool
+  default     = false
 }
-
 
 variable "smarties" {
-  description = "Map of smart groups to create"
+  description = "Map of smart groups to create. Each entry supports one selector type: cidr, tags, s2c, or s2c_domain."
   type = map(object({
     cidr       = optional(string)
     tags       = optional(map(string))
@@ -36,7 +39,7 @@ variable "destroy_url" {
 }
 
 variable "policies" {
-  description = "Map of distributed firewalling policies"
+  description = "Map of distributed firewalling policies."
   type = map(object({
     action           = string
     priority         = number

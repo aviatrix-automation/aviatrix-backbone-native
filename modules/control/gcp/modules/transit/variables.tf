@@ -14,6 +14,7 @@ variable "project_id" {
 }
 
 variable "transits" {
+  description = "List of transit gateway configurations for GCP with NCC, BGP-over-LAN, and optional FireNet."
   type = list(object({
     gw_name             = string
     project_id          = string
@@ -151,6 +152,7 @@ variable "transits" {
 }
 
 variable "spokes" {
+  description = "List of spoke VPC configurations to attach to NCC hubs."
   type = list(object({
     vpc_name   = string
     project_id = string

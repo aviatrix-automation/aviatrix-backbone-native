@@ -1,3 +1,4 @@
 output "controlplane_data" {
-  value = module.control_plane
+  description = "All outputs from the Aviatrix control plane module."
+  value       = module.control_plane
 }

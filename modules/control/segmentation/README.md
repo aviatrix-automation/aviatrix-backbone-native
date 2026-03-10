@@ -152,7 +152,7 @@ terraform apply
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| aws_ssw_region | AWS region for SSM parameter retrieval | `string` | n/a | yes |
+| aws_ssm_region | AWS region for SSM parameter retrieval | `string` | n/a | yes |
 | domains | List of unique domain names for segmentation | `list(string)` | `[]` | no |
 | connection_policy | List of connection policies defining allowed domain communication | `list(object({ source = string, target = string }))` | `[]` | no |
 | destroy_url | Dummy URL used by terracurl during destroy operations | `string` | `"https://checkip.amazonaws.com"` | no |
@@ -275,7 +275,7 @@ terraform output -raw association_sources_table
 module "segmentation" {
   source = "./segmentation"
 
-  aws_ssw_region = "us-east-1"
+  aws_ssm_region = "us-east-1"
 
   domains = [
     "production",
@@ -304,7 +304,7 @@ Override auto-inference for connections with non-standard naming:
 module "segmentation" {
   source = "./segmentation"
 
-  aws_ssw_region = "us-east-1"
+  aws_ssm_region = "us-east-1"
 
   domains = ["prod", "dev", "shared"]
 
@@ -332,7 +332,7 @@ Enable spoke associations for AWS, Azure, and GCP:
 module "segmentation" {
   source = "./segmentation"
 
-  aws_ssw_region = "us-east-1"
+  aws_ssm_region = "us-east-1"
 
   domains = ["prod", "dev"]
 
@@ -362,7 +362,7 @@ Exclude test and temporary resources from domain associations:
 module "segmentation" {
   source = "./segmentation"
 
-  aws_ssw_region = "us-east-1"
+  aws_ssm_region = "us-east-1"
 
   domains = ["prod", "dev"]
 
@@ -396,7 +396,7 @@ Combine all features for maximum flexibility:
 module "segmentation" {
   source = "./segmentation"
 
-  aws_ssw_region = "us-east-1"
+  aws_ssm_region = "us-east-1"
 
   domains = ["prod", "dev", "shared", "dmz"]
 
