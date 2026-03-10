@@ -39,13 +39,31 @@ The module provides:
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
+## Usage
+
+```hcl
+module "aws_transit" {
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/aws?ref=v0.8.0"
+
+  aws_ssm_region   = "us-east-1"
+  region           = "us-east-1"
+  tags             = { Environment = "production" }
+  transits         = var.transits
+  tgws             = var.tgws
+  external_devices = var.external_devices
+  spokes           = var.spokes
+}
+```
+
+See [examples/aws/](../../../examples/aws/) for a complete configuration example with `.tfvars.example`.
+
 ## Requirements
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.0 |
-| aviatrix | >= 3.0 |
-| aws | >= 4.0 |
+| terraform | >= 1.3 |
+| aviatrix | ~> 8.2 |
+| aws | ~> 5.0 |
 
 ## Providers
 
@@ -85,6 +103,7 @@ The module provides:
 |------|-------------|------|:--------:|
 | aws_ssm_region | AWS region for SSM parameter retrieval | `string` | yes |
 | region | AWS region for transit deployment | `string` | yes |
+| tags | Map of tags to apply to resources | `map(string)` | no |
 | transits | Map of transit gateway configurations | `map(object)` | no |
 | tgws | Map of AWS Transit Gateway configurations | `map(object)` | no |
 | spokes | Map of spoke gateway configurations | `map(object)` | no |

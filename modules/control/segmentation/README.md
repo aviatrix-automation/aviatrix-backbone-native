@@ -112,10 +112,10 @@ terraform apply
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.0 |
-| aviatrix | 8.2.0 |
-| terracurl | 2.1.0 |
-| aws | >= 4.0 |
+| terraform | >= 1.3 |
+| aviatrix | ~> 8.2 |
+| terracurl | ~> 2.1 |
+| aws | ~> 5.0 |
 | http | >= 3.0 |
 
 ## Providers
@@ -273,7 +273,7 @@ terraform output -raw association_sources_table
 
 ```hcl
 module "segmentation" {
-  source = "./segmentation"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/segmentation?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 
@@ -302,7 +302,7 @@ Override auto-inference for connections with non-standard naming:
 
 ```hcl
 module "segmentation" {
-  source = "./segmentation"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/segmentation?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 
@@ -330,7 +330,7 @@ Enable spoke associations for AWS, Azure, and GCP:
 
 ```hcl
 module "segmentation" {
-  source = "./segmentation"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/segmentation?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 
@@ -360,7 +360,7 @@ Exclude test and temporary resources from domain associations:
 
 ```hcl
 module "segmentation" {
-  source = "./segmentation"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/segmentation?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 
@@ -394,7 +394,7 @@ Combine all features for maximum flexibility:
 
 ```hcl
 module "segmentation" {
-  source = "./segmentation"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/segmentation?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 

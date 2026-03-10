@@ -36,7 +36,7 @@ This workaround prevents a full ruleset diff and ensures Terraform only shows ch
 
 ```hcl
 module "dcf" {
-  source = "./modules/control/dcf"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/dcf?ref=v0.8.0"
 
   aws_ssm_region                = "us-east-1"
   enable_distributed_firewalling = true

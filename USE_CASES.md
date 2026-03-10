@@ -4,8 +4,8 @@
 
 The Aviatrix Backbone Native modules provide a complete Infrastructure-as-Code solution for deploying and managing multi-cloud network infrastructure. The modules support enterprise-grade networking across AWS, Azure, and GCP with advanced features including high-performance encryption, network segmentation, distributed firewalling, and native cloud service integration.
 
-**Version:** 0.3.0+
-**Last Updated:** January 2026
+**Version:** 0.8.0+
+**Last Updated:** March 2026
 
 ---
 
