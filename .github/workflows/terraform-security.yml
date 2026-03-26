@@ -39,9 +39,9 @@ jobs:
           tfsec --version
 
       - name: Run tfsec
-        # tfsec is deprecated in favor of trivy; SARIF output skipped due to a
-        # known tfsec incompatibility (generates git:// URIs, GitHub expects file://).
-        # Third-party module findings excluded via --exclude (see .checkov.yaml rationale).
+        # SARIF upload omitted: tfsec generates git:// URIs which are incompatible
+        # with github/codeql-action/upload-sarif (expects file:// URIs).
+        # Third-party Aviatrix controller module findings excluded via --exclude.
         run: |
           tfsec modules/ --soft-fail \
             --exclude aws-ec2-no-public-egress-sgr,aws-ec2-enforce-http-token-imds,aws-ec2-require-vpc-flow-logs-for-all-vpcs,aws-ec2-add-description-to-security-group-rule,aws-ec2-volume-encryption-customer-key
@@ -54,7 +54,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Checkov
-        uses: bridgecrewio/checkov-action@master
+        # Uses .checkov.yaml for directory scope and all skip-check suppressions.
+        # output_format changed from "cli,sarif" (unsupported in bundled checkov 2.3.22)
+        # to "sarif" only.
+        uses: bridgecrewio/checkov-action@v12.2138.0
         with:
           config_file: .checkov.yaml
           soft_fail: true
@@ -74,16 +77,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          trivy --version
+
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: modules/
-          scanners: misconfig
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: '0'
-          trivyignores: .trivyignore
+        run: |
+          trivy fs --scanners misconfig \
+            --ignorefile .trivyignore \
+            --format sarif \
+            --output trivy-results.sarif \
+            --exit-code 0 \
+            modules/
 
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v4
