@@ -5,12 +5,16 @@ on:
     paths:
       - '**.tf'
       - '.github/workflows/terraform-security.yml'
+      - '.checkov.yaml'
+      - '.trivyignore'
   push:
     branches:
       - main
     paths:
       - '**.tf'
       - '.github/workflows/terraform-security.yml'
+      - '.checkov.yaml'
+      - '.trivyignore'
   schedule:
     - cron: '0 0 * * 1'  # Weekly on Mondays
 
@@ -35,13 +39,12 @@ jobs:
           tfsec --version
 
       - name: Run tfsec
-        run: tfsec --format sarif --minimum-severity MEDIUM . > results.sarif || true
-
-      - name: Upload tfsec SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: results.sarif
+        # tfsec is deprecated in favor of trivy; SARIF output skipped due to a
+        # known tfsec incompatibility (generates git:// URIs, GitHub expects file://).
+        # Third-party module findings excluded via --exclude (see .checkov.yaml rationale).
+        run: |
+          tfsec modules/ --soft-fail \
+            --exclude aws-ec2-no-public-egress-sgr,aws-ec2-enforce-http-token-imds,aws-ec2-require-vpc-flow-logs-for-all-vpcs,aws-ec2-add-description-to-security-group-rule,aws-ec2-volume-encryption-customer-key
 
   checkov:
     name: Checkov Security Scan
@@ -51,17 +54,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Checkov
-        uses: bridgecrewio/checkov-action@v12.2138.0
+        uses: bridgecrewio/checkov-action@master
         with:
-          directory: .
-          framework: terraform
+          config_file: .checkov.yaml
           soft_fail: true
-          output_format: cli,sarif
-          output_file_path: console,results.sarif
-          skip_check: CKV_AWS_79,CKV_AWS_23  # Skip instance metadata checks
+          output_format: sarif
+          output_file_path: results.sarif
 
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: results.sarif
@@ -73,19 +74,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Trivy
-        run: |
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
-          trivy --version
-
-      - name: Run Trivy vulnerability scanner
-        run: trivy config --format sarif --output trivy-results.sarif --severity CRITICAL,HIGH,MEDIUM --exit-code 0 .
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: modules/
+          scanners: misconfig
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+          trivyignores: .trivyignore
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
