@@ -1,4 +1,4 @@
-.PHONY: lint lint-python lint-terraform lint-security lint-checkov lint-tfsec fmt install install-security
+.PHONY: lint lint-python lint-terraform lint-security lint-checkov lint-tfsec lint-trivy fmt install install-security
 
 UV_CMD = uv tool run ruff
 
@@ -14,7 +14,7 @@ lint-terraform:
 	@tflint --chdir modules/ --recursive --minimum-failure-severity=error
 	@echo "Terraform linted!"
 
-lint-security: lint-checkov lint-tfsec
+lint-security: lint-checkov lint-tfsec lint-trivy
 
 lint-checkov:
 	@echo "Running Checkov security scan ..."
@@ -23,8 +23,14 @@ lint-checkov:
 
 lint-tfsec:
 	@echo "Running tfsec security scan ..."
-	@tfsec modules/ --soft-fail
+	@tfsec modules/ --soft-fail \
+		--exclude aws-ec2-no-public-egress-sgr,aws-ec2-enforce-http-token-imds,aws-ec2-require-vpc-flow-logs-for-all-vpcs,aws-ec2-add-description-to-security-group-rule,aws-ec2-volume-encryption-customer-key
 	@echo "tfsec scan complete!"
+
+lint-trivy:
+	@echo "Running Trivy misconfiguration scan ..."
+	@trivy fs --scanners misconfig --ignorefile .trivyignore --skip-version-check modules/
+	@echo "Trivy scan complete!"
 
 fmt:
 	@echo "Formatting code using ruff ..."
@@ -49,5 +55,8 @@ install-security:
 	@pip install checkov || { echo "Installation failed!"; exit 1; }
 	@echo "checkov installed!"
 	@echo "Installing tfsec..."
-	@curl --retry 3 --retry-delay 5 -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash || { echo "Installation failed!"; exit 1; }
+	@brew install tfsec || { echo "Installation failed!"; exit 1; }
 	@echo "tfsec installed!"
+	@echo "Installing trivy..."
+	@brew install trivy || { echo "Installation failed!"; exit 1; }
+	@echo "trivy installed!"

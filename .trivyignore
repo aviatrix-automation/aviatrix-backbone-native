@@ -1,0 +1,18 @@
+# The following findings are in downloaded third-party modules (.terraform/modules/)
+# from the terraform-aviatrix-modules/aws-controlplane registry module.
+# These cannot be fixed in this repo — suppressed to avoid noise.
+
+# Instance does not require IMDS access to require a token
+AWS-0028
+
+# Security group rule allows unrestricted egress to any IP address
+AWS-0104
+
+# VPC does not have VPC Flow Logs enabled
+AWS-0178
+
+# Security group rule allows ingress from public internet
+AWS-0027
+
+# No encryption at rest for EBS volume
+AWS-0124
