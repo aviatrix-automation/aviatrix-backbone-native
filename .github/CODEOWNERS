@@ -1,0 +1,17 @@
+# Default owners for everything
+*                           @aviatrix-automation/platform-team
+
+# Cloud-specific module owners
+modules/control/aws/        @aviatrix-automation/aws-team @aviatrix-automation/platform-team
+modules/control/azure/      @aviatrix-automation/azure-team @aviatrix-automation/platform-team
+modules/control/gcp/        @aviatrix-automation/gcp-team @aviatrix-automation/platform-team
+
+# Cross-cutting modules
+modules/control/peering/       @aviatrix-automation/platform-team
+modules/control/segmentation/  @aviatrix-automation/platform-team
+modules/control/dcf/           @aviatrix-automation/platform-team
+modules/mgmt/                  @aviatrix-automation/platform-team
+
+# CI/CD and release
+.github/                    @aviatrix-automation/platform-team
+release-please-config.json  @aviatrix-automation/platform-team

@@ -265,6 +265,7 @@
           <profile/>
         </qos>
         <virtual-router>
+          <!-- Single VR: all interfaces, PBF handles asymmetric return for external LB -->
           <entry name="default">
             <protocol>
               <bgp>
@@ -476,6 +477,45 @@
           <service-group/>
           <schedule/>
           <rulebase>
+%{ if fw_egress_ip != "" && length(external_lb_rules) > 0 ~}
+            <pbf>
+              <rules>
+                <!-- PBF: enforce-symmetric-return for external LB traffic.
+                     c2s: forward to LAN GW (aligns with DNAT routing to workload)
+                     s2c: symmetric return forces traffic back out ethernet1/1 via egress GW MAC -->
+                <entry name="ELB-SYMRET">
+                  <from>
+                    <interface>
+                      <member>ethernet1/1</member>
+                    </interface>
+                  </from>
+                  <source>
+                    <member>any</member>
+                  </source>
+                  <destination>
+                    <member>any</member>
+                  </destination>
+                  <service>
+                    <member>any</member>
+                  </service>
+                  <action>
+                    <forward>
+                      <egress-interface>ethernet1/2</egress-interface>
+                      <nexthop>
+                        <ip-address>${lan_gateway}</ip-address>
+                      </nexthop>
+                    </forward>
+                  </action>
+                  <enforce-symmetric-return>
+                    <enabled>yes</enabled>
+                    <nexthop-address-list>
+                      <entry name="${egress_gateway}"/>
+                    </nexthop-address-list>
+                  </enforce-symmetric-return>
+                </entry>
+              </rules>
+            </pbf>
+%{ endif ~}
             <security>
               <rules>
 %{ for rule in external_lb_rules ~}
@@ -564,7 +604,7 @@
                     <translated-port>${rule.backend_port}</translated-port>
                   </destination-translation>
                   <to>
-                    <member>any</member>
+                    <member>WAN</member>
                   </to>
                   <from>
                     <member>WAN</member>

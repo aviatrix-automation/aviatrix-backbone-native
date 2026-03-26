@@ -223,6 +223,10 @@ resource "aviatrix_firenet" "firenet" {
   vpc_id             = module.mc-transit[each.key].vpc.vpc_id
   inspection_enabled = each.value.inspection_enabled
   egress_enabled     = each.value.egress_enabled
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "tls_private_key" "generated" {
@@ -651,19 +655,19 @@ resource "aws_ec2_transit_gateway_connect_peer" "ha_connect_peer-8" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-1" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-1-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_1},${local.tgw_connect_ip[each.key].ha_connect_peer_1}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-1-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_1},${local.tgw_connect_ip[each.key].ha_connect_peer_1}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_1, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_1, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -676,19 +680,19 @@ resource "aviatrix_transit_external_device_conn" "external-1" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-2" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-2-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_2},${local.tgw_connect_ip[each.key].ha_connect_peer_2}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-2-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_2},${local.tgw_connect_ip[each.key].ha_connect_peer_2}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_2, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_2, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -701,19 +705,19 @@ resource "aviatrix_transit_external_device_conn" "external-2" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-3" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-3-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_3},${local.tgw_connect_ip[each.key].ha_connect_peer_3}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-3-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_3},${local.tgw_connect_ip[each.key].ha_connect_peer_3}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_3, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_3, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -726,19 +730,19 @@ resource "aviatrix_transit_external_device_conn" "external-3" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-4" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-4-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_4},${local.tgw_connect_ip[each.key].ha_connect_peer_4}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-4-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_4},${local.tgw_connect_ip[each.key].ha_connect_peer_4}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_4, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_4, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -751,19 +755,19 @@ resource "aviatrix_transit_external_device_conn" "external-4" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-5" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-5-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_5},${local.tgw_connect_ip[each.key].ha_connect_peer_5}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-5-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_5},${local.tgw_connect_ip[each.key].ha_connect_peer_5}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_5, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_5, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -776,19 +780,19 @@ resource "aviatrix_transit_external_device_conn" "external-5" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-6" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-6-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_6},${local.tgw_connect_ip[each.key].ha_connect_peer_6}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-6-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_6},${local.tgw_connect_ip[each.key].ha_connect_peer_6}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_6, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_6, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -801,19 +805,19 @@ resource "aviatrix_transit_external_device_conn" "external-6" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-7" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-7-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_7},${local.tgw_connect_ip[each.key].ha_connect_peer_7}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-7-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_7},${local.tgw_connect_ip[each.key].ha_connect_peer_7}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_7, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_7, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)
@@ -826,19 +830,19 @@ resource "aviatrix_transit_external_device_conn" "external-7" {
 }
 
 resource "aviatrix_transit_external_device_conn" "external-8" {
-  for_each                    = local.transit_tgw_map
-  vpc_id                      = module.mc-transit[each.value.transit_key].vpc.vpc_id
-  connection_name             = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-8-${each.value.transit_key}"
-  gw_name                     = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
-  remote_gateway_ip           = "${local.tgw_connect_ip[each.key].connect_peer_8},${local.tgw_connect_ip[each.key].ha_connect_peer_8}"
-  direct_connect              = true
-  bgp_local_as_num            = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
-  bgp_remote_as_num           = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
-  tunnel_protocol             = "GRE"
-  ha_enabled                  = false
-  local_tunnel_cidr           = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 1)}/29"
-  remote_tunnel_cidr          = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 2)}/29"
-  custom_algorithms           = false
+  for_each                      = local.transit_tgw_map
+  vpc_id                        = module.mc-transit[each.value.transit_key].vpc.vpc_id
+  connection_name               = "external-${each.value.tgw_name}-${local.tgw_name_to_id[each.value.tgw_name]}-8-${each.value.transit_key}"
+  gw_name                       = module.mc-transit[each.value.transit_key].transit_gateway.gw_name
+  remote_gateway_ip             = "${local.tgw_connect_ip[each.key].connect_peer_8},${local.tgw_connect_ip[each.key].ha_connect_peer_8}"
+  direct_connect                = true
+  bgp_local_as_num              = module.mc-transit[each.value.transit_key].transit_gateway.local_as_number
+  bgp_remote_as_num             = local.tgw_name_to_info[each.value.tgw_name].amazon_side_asn
+  tunnel_protocol               = "GRE"
+  ha_enabled                    = false
+  local_tunnel_cidr             = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 1)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 1)}/29"
+  remote_tunnel_cidr            = "${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].connect_peer_8, 2)}/29,${cidrhost(var.transits[each.value.transit_key].inside_cidr_blocks[each.value.tgw_name].ha_connect_peer_8, 2)}/29"
+  custom_algorithms             = false
   phase1_local_identifier       = null
   enable_jumbo_frame            = true
   manual_bgp_advertised_cidrs   = try(var.transits[each.value.transit_key].tgw_connection_cidrs[each.value.tgw_name], var.transits[each.value.transit_key].manual_bgp_advertised_cidrs)

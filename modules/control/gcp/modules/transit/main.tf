@@ -822,6 +822,10 @@ resource "aviatrix_firenet" "firenet" {
   vpc_id             = module.mc_transit[each.key].vpc.vpc_id
   inspection_enabled = each.value.inspection_enabled
   egress_enabled     = each.value.egress_enabled
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aviatrix_firewall_instance_association" "fw_associations" {
@@ -1109,11 +1113,10 @@ module "mc-spoke" {
   single_ip_snat   = each.value.single_ip_snat
 }
 
-# Global External Application LB fronting PAN firewall public IPs via Internet NEGs.
-# Uses INTERNET_IP_PORT NEGs so GFE communicates with FW backends via the public internet,
-# avoiding routing conflicts with internal Google HC ranges (35.191.0.0/16) used by ILB.
-# PAN-OS receives traffic with dst = its own egress NIC IP (GCP 1:1 NAT from public IP).
-# DNAT rewrites the destination to the real backend before PAN-OS classifies it as host traffic.
+# Global External Application LB fronting PAN firewall egress interfaces via Zonal NEGs.
+# Uses GCE_VM_IP_PORT NEGs so GFE communicates with FW backends via Google's internal network.
+# PAN-OS uses a single VR with a PBF rule (enforce-symmetric-return) to handle
+# asymmetric routing caused by the GFE proxy sourcing all traffic from 35.191.0.0/16.
 
 resource "google_compute_health_check" "ext_lb" {
   for_each = local.lb_external_transits
@@ -1126,23 +1129,28 @@ resource "google_compute_health_check" "ext_lb" {
   }
 }
 
-# One Internet NEG per firewall (Internet NEGs support only 1 endpoint each)
-resource "google_compute_global_network_endpoint_group" "ext_lb" {
+# One zonal NEG per firewall (each FW may be in a different zone)
+resource "google_compute_network_endpoint_group" "ext_lb" {
   for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if lookup(local.lb_external_transits, fw.gw_name, null) != null }
 
   name                  = "${each.key}-ext-lb-neg"
   project               = each.value.project_id
-  network_endpoint_type = "INTERNET_IP_PORT"
+  zone                  = each.value.zone
+  network               = google_compute_network.egress_vpcs[each.value.gw_name].self_link
+  subnetwork            = google_compute_subnetwork.egress_subnets[each.value.gw_name].self_link
+  network_endpoint_type = "GCE_VM_IP_PORT"
   default_port          = local.lb_external_hc_rule[each.value.gw_name].frontend_port
 }
 
-resource "google_compute_global_network_endpoint" "ext_lb" {
+resource "google_compute_network_endpoint" "ext_lb" {
   for_each = { for fw in local.fws : "${fw.gw_name}-${fw.type}-fw${fw.index + 1}" => fw if lookup(local.lb_external_transits, fw.gw_name, null) != null }
 
-  project                       = each.value.project_id
-  global_network_endpoint_group = google_compute_global_network_endpoint_group.ext_lb[each.key].id
-  ip_address                    = module.pan_fw[each.key].instance.network_interface[0].access_config[0].nat_ip
-  port                          = local.lb_external_hc_rule[each.value.gw_name].frontend_port
+  project                = each.value.project_id
+  zone                   = each.value.zone
+  network_endpoint_group = google_compute_network_endpoint_group.ext_lb[each.key].id
+  instance               = module.pan_fw[each.key].instance.name
+  ip_address             = each.value.egress_ip
+  port                   = local.lb_external_hc_rule[each.value.gw_name].frontend_port
 
   depends_on = [module.pan_fw]
 }
@@ -1164,7 +1172,7 @@ resource "google_compute_backend_service" "ext_lb" {
       fw_key => fw
     }
     content {
-      group                 = google_compute_global_network_endpoint_group.ext_lb[backend.key].self_link
+      group                 = google_compute_network_endpoint_group.ext_lb[backend.key].self_link
       balancing_mode        = "RATE"
       max_rate_per_endpoint = 1000
       capacity_scaler       = 1.0
@@ -1172,7 +1180,7 @@ resource "google_compute_backend_service" "ext_lb" {
   }
 
   depends_on = [
-    google_compute_global_network_endpoint.ext_lb,
+    google_compute_network_endpoint.ext_lb,
   ]
 }
 

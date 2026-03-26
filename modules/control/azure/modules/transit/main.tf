@@ -213,16 +213,16 @@ locals {
       enable_ikev2              = v.enable_ikev2
       inspected_by_firenet      = v.inspected_by_firenet
       # Custom IPsec algorithm parameters
-      custom_algorithms         = v.custom_algorithms
-      pre_shared_key            = v.pre_shared_key
-      backup_pre_shared_key     = v.backup_pre_shared_key
-      phase_1_authentication    = v.phase_1_authentication
-      phase_1_dh_groups         = v.phase_1_dh_groups
-      phase_1_encryption        = v.phase_1_encryption
-      phase_2_authentication    = v.phase_2_authentication
-      phase_2_dh_groups         = v.phase_2_dh_groups
-      phase_2_encryption        = v.phase_2_encryption
-      phase1_local_identifier   = v.phase1_local_identifier
+      custom_algorithms       = v.custom_algorithms
+      pre_shared_key          = v.pre_shared_key
+      backup_pre_shared_key   = v.backup_pre_shared_key
+      phase_1_authentication  = v.phase_1_authentication
+      phase_1_dh_groups       = v.phase_1_dh_groups
+      phase_1_encryption      = v.phase_1_encryption
+      phase_2_authentication  = v.phase_2_authentication
+      phase_2_dh_groups       = v.phase_2_dh_groups
+      phase_2_encryption      = v.phase_2_encryption
+      phase1_local_identifier = v.phase1_local_identifier
       # BGP learned CIDRs and manual advertisement parameters
       enable_learned_cidrs_approval = v.enable_learned_cidrs_approval
       approved_cidrs                = v.approved_cidrs
@@ -500,9 +500,9 @@ module "mc-transit" {
   learned_cidr_approval       = each.value.learned_cidr_approval
   learned_cidrs_approval_mode = each.value.learned_cidrs_approval_mode
   approved_learned_cidrs      = each.value.approved_learned_cidrs
-  resource_group                   = azurerm_resource_group.transit_rg[each.key].name
-  bgp_lan_interfaces_count         = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
-  tags                             = var.tags
+  resource_group              = azurerm_resource_group.transit_rg[each.key].name
+  bgp_lan_interfaces_count    = length(local.vwan_names_per_transit[each.key]) > 0 ? min(length(local.vwan_names_per_transit[each.key]), 3) : 1
+  tags                        = var.tags
 }
 
 resource "aviatrix_firenet" "firenet" {
@@ -513,6 +513,10 @@ resource "aviatrix_firenet" "firenet" {
   vpc_id             = module.mc-transit[each.key].vpc.vpc_id
   inspection_enabled = each.value.inspection_enabled
   egress_enabled     = each.value.egress_enabled
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # NSG for PAN Management Interface
@@ -906,18 +910,18 @@ resource "aviatrix_transit_external_device_conn" "transit_external" {
     if length(var.transits[pair.transit_key].vwan_connections != null ? var.transits[pair.transit_key].vwan_connections : []) > 0
   }
 
-  vpc_id                    = each.value.type == "transit" ? module.mc-transit[each.value.key].vpc.vpc_id : module.mc-spoke[each.value.key].vpc.vpc_id
-  connection_name           = "external-${each.value.vwan_hub_name}-${each.value.key}"
-  gw_name                   = each.value.type == "transit" ? module.mc-transit[each.value.key].transit_gateway.gw_name : module.mc-spoke[each.value.key].spoke_gateway.gw_name
-  connection_type           = "bgp"
-  tunnel_protocol           = "LAN"
-  remote_vpc_name           = format("%s:%s:%s", local.hub_managed_vnets[each.value.vwan_hub_name].vnet_name, local.hub_managed_vnets[each.value.vwan_hub_name].resource_group, local.hub_managed_vnets[each.value.vwan_hub_name].subscription_id)
-  ha_enabled                = true
-  bgp_local_as_num          = each.value.local_as_number
-  bgp_remote_as_num         = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
-  backup_bgp_remote_as_num  = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
-  remote_lan_ip             = local.vwan_connect_ip[each.key].hub_ip_primary
-  backup_remote_lan_ip      = local.vwan_connect_ip[each.key].hub_ip_ha
+  vpc_id                        = each.value.type == "transit" ? module.mc-transit[each.value.key].vpc.vpc_id : module.mc-spoke[each.value.key].vpc.vpc_id
+  connection_name               = "external-${each.value.vwan_hub_name}-${each.value.key}"
+  gw_name                       = each.value.type == "transit" ? module.mc-transit[each.value.key].transit_gateway.gw_name : module.mc-spoke[each.value.key].spoke_gateway.gw_name
+  connection_type               = "bgp"
+  tunnel_protocol               = "LAN"
+  remote_vpc_name               = format("%s:%s:%s", local.hub_managed_vnets[each.value.vwan_hub_name].vnet_name, local.hub_managed_vnets[each.value.vwan_hub_name].resource_group, local.hub_managed_vnets[each.value.vwan_hub_name].subscription_id)
+  ha_enabled                    = true
+  bgp_local_as_num              = each.value.local_as_number
+  bgp_remote_as_num             = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
+  backup_bgp_remote_as_num      = local.vwan_hub_info[each.value.vwan_hub_name].azure_asn
+  remote_lan_ip                 = local.vwan_connect_ip[each.key].hub_ip_primary
+  backup_remote_lan_ip          = local.vwan_connect_ip[each.key].hub_ip_ha
   local_lan_ip                  = each.value.bgp_lan_ips.primary
   backup_local_lan_ip           = each.value.bgp_lan_ips.ha
   enable_bgp_lan_activemesh     = true
@@ -1035,16 +1039,16 @@ resource "aviatrix_transit_external_device_conn" "external_device" {
   backup_remote_tunnel_cidr = each.value.ha_enabled ? each.value.backup_remote_tunnel_cidr : null
   enable_ikev2              = each.value.enable_ikev2 != null ? each.value.enable_ikev2 : false
   # Custom IPsec algorithm support - only set when custom_algorithms is true
-  custom_algorithms         = each.value.custom_algorithms
-  pre_shared_key            = each.value.pre_shared_key
-  backup_pre_shared_key     = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
-  phase_1_authentication    = each.value.custom_algorithms ? each.value.phase_1_authentication : null
-  phase_1_dh_groups         = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
-  phase_1_encryption        = each.value.custom_algorithms ? each.value.phase_1_encryption : null
-  phase_2_authentication    = each.value.custom_algorithms ? each.value.phase_2_authentication : null
-  phase_2_dh_groups         = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
-  phase_2_encryption        = each.value.custom_algorithms ? each.value.phase_2_encryption : null
-  phase1_local_identifier   = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
+  custom_algorithms       = each.value.custom_algorithms
+  pre_shared_key          = each.value.pre_shared_key
+  backup_pre_shared_key   = each.value.ha_enabled ? each.value.backup_pre_shared_key : null
+  phase_1_authentication  = each.value.custom_algorithms ? each.value.phase_1_authentication : null
+  phase_1_dh_groups       = each.value.custom_algorithms ? each.value.phase_1_dh_groups : null
+  phase_1_encryption      = each.value.custom_algorithms ? each.value.phase_1_encryption : null
+  phase_2_authentication  = each.value.custom_algorithms ? each.value.phase_2_authentication : null
+  phase_2_dh_groups       = each.value.custom_algorithms ? each.value.phase_2_dh_groups : null
+  phase_2_encryption      = each.value.custom_algorithms ? each.value.phase_2_encryption : null
+  phase1_local_identifier = each.value.custom_algorithms ? each.value.phase1_local_identifier : null
   # BGP learned CIDRs and manual advertisement support - only set when bgp_enabled is true
   enable_learned_cidrs_approval = each.value.bgp_enabled ? each.value.enable_learned_cidrs_approval : null
   approved_cidrs                = each.value.bgp_enabled && each.value.enable_learned_cidrs_approval ? each.value.approved_cidrs : null

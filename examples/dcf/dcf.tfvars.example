@@ -15,7 +15,7 @@
 # ----------------------------------------------------------------------------
 
 # AWS region for SSM parameter retrieval (controller credentials)
-aws_ssw_region = "us-east-1"
+aws_ssm_region = "us-east-1"
 
 # ----------------------------------------------------------------------------
 # DCF Global Settings
