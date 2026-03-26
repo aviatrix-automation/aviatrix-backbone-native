@@ -16,24 +16,39 @@ Terraform modules for deploying and managing multi-cloud network infrastructure 
 │   │   └── dcf/             # Distributed Cloud Firewall
 │   ├── mgmt/                # Aviatrix Controller Deployment
 │   └── migration/           # Migration utilities
-├── examples/                # Usage examples
+├── examples/                # Usage examples and tfvars templates
 ├── docs/                    # Documentation
 └── tests/                   # Test infrastructure
 ```
 
 ## Quick Start
 
-See [docs/getting-started.md](docs/getting-started.md) for a complete guide.
+### Module Consumption
+
+Each module is consumable from a versioned Git source:
+
+```hcl
+module "aws_transit" {
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/aws?ref=v0.8.0"
+
+  aws_ssm_region = "us-east-1"
+  region         = "us-east-1"
+  transits       = var.transits
+  tgws           = var.tgws
+}
+```
+
+Pin to a release tag (e.g., `?ref=v0.8.0`) for stability. See [examples/](examples/) for full configuration samples and [docs/getting-started.md](docs/getting-started.md) for a complete guide.
 
 ## Prerequisites
 
-- **Terraform:** >= 1.0
-- **Aviatrix Controller:** 8.0+
+- **Terraform:** >= 1.3
+- **Aviatrix Controller:** 8.x
 - **Providers:**
-  - Aviatrix: 8.1.x
-  - AWS: >= 5.0
-  - Azure: >= 3.0
-  - Google: >= 5.0
+  - Aviatrix: ~> 8.2
+  - AWS: ~> 5.0
+  - Azure: ~> 3.0
+  - Google: ~> 5.0
 
 See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version requirements.
 
@@ -49,6 +64,20 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version requirements.
 | [control/dcf](modules/control/dcf/) | Distributed cloud firewall policies | Multi-cloud |
 | [mgmt](modules/mgmt/) | Aviatrix Controller deployment | AWS |
 | [migration](modules/migration/) | Migration utilities | Multi-cloud |
+
+## Module Composition
+
+Each cloud module follows a two-level composition pattern:
+
+```
+modules/control/{cloud}/
+  main.tf          # Passthrough to submodule
+  variables.tf     # Public interface
+  outputs.tf       # Public outputs
+  modules/transit/ # Implementation (providers, resources, locals)
+```
+
+The outer module is the public API consumers use via `source = "git::..."`. The inner submodule contains all implementation details including provider configuration, resource definitions, and locals.
 
 ## Compatibility Matrix
 
@@ -89,15 +118,25 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for detailed version requirements.
 
 ## Examples
 
-- [AWS Basic Transit](examples/aws-basic/)
-- [Azure Basic Transit](examples/azure-basic/)
-- [GCP Basic Transit](examples/gcp-basic/)
-- [Multi-Cloud Deployment](examples/multi-cloud/)
+Each cloud module has a consumption example and a `.tfvars.example` template:
+
+- [AWS Example](examples/aws/) — `main.tf` + `aws.tfvars.example`
+- [Azure Example](examples/azure/) — `main.tf` + `azure.tfvars.example`
+- [GCP Example](examples/gcp/) — `main.tf` + `gcp.tfvars.example`
 
 ## Documentation
 
 - [Architecture Overview](docs/architecture.md)
 - [Getting Started](docs/getting-started.md)
-- [Upgrade Guide](docs/upgrade-guide.md)
+- [Use Cases](USE_CASES.md)
+- [Contributing](CONTRIBUTING.md)
 - [Compatibility Matrix](COMPATIBILITY.md)
 - [Changelog](CHANGELOG.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for module consumption patterns, development setup, and pull request process.
+
+## Releases
+
+This project uses [release-please](https://github.com/googleapis/release-please) with [Conventional Commits](https://www.conventionalcommits.org/) for automated semantic versioning. See [CONTRIBUTING.md](CONTRIBUTING.md) for commit conventions.

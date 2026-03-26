@@ -1,12 +1,11 @@
-
 variable "aws_ssm_region" {
   description = "AWS SSM region for parameter retrieval."
   type        = string
 }
 
 variable "project_id" {
+  description = "GCP project ID for NCC hubs and Palo Alto Network bootstrap storage buckets."
   type        = string
-  description = "GCP project ID for NCC hubs and for Palo Alto Network bootstrap storage buckets"
   validation {
     condition     = length(var.project_id) > 0
     error_message = "project_id must be non-empty."
@@ -26,20 +25,19 @@ variable "transits" {
     cloud_router_asn    = number
     aviatrix_gw_asn     = number
     bgp_lan_subnets = map(object({
-      cidr                 = string           # CIDR for new subnet or validation for existing
-      existing_subnet_name = optional(string) # Name of existing subnet (when NCC hub create = false)
+      cidr                 = string
+      existing_subnet_name = optional(string)
     }))
-    fw_amount                   = optional(number, 0)
-    fw_instance_size            = optional(string, "n2-standard-4")
-    firewall_image              = optional(string, "")
-    firewall_image_version      = optional(string, "")
-    attach_firewall             = optional(bool, true)
-    lan_cidr                    = optional(string, "")
-    mgmt_cidr                   = optional(string, "")
-    egress_cidr                 = optional(string, "")
-    manual_bgp_advertised_cidrs = optional(set(string), [])
-    bgp_lan_connection_cidrs    = optional(map(set(string)), {})
-    # Per-connection learned CIDR approval (key = ncc_hub_name/intf_type)
+    fw_amount                                = optional(number, 0)
+    fw_instance_size                         = optional(string, "n2-standard-4")
+    firewall_image                           = optional(string, "")
+    firewall_image_version                   = optional(string, "")
+    attach_firewall                          = optional(bool, true)
+    lan_cidr                                 = optional(string, "")
+    mgmt_cidr                                = optional(string, "")
+    egress_cidr                              = optional(string, "")
+    manual_bgp_advertised_cidrs              = optional(set(string), [])
+    bgp_lan_connection_cidrs                 = optional(map(set(string)), {})
     bgp_lan_connection_learned_cidr_approval = optional(map(bool), {})
     bgp_lan_connection_approved_cidrs        = optional(map(set(string)), {})
     inspection_enabled                       = optional(bool, false)
@@ -51,25 +49,19 @@ variable "transits" {
     service_account                          = optional(string, "")
     name_prefix                              = optional(string, "paloaltonetworks-firewall-bootstrap-")
     files                                    = optional(map(string), {})
-    # Learned CIDRs approval configuration
-    learned_cidr_approval       = optional(string, "false")
-    learned_cidrs_approval_mode = optional(string, null)
-    approved_learned_cidrs      = optional(list(string), null)
-    # External load balancer NAT rules — each rule creates a DNAT+SNAT path through the PAN firewalls
-    # to an internal workload. One rule must have health_check = true (ELB HC probes the workload through the FW).
+    learned_cidr_approval                    = optional(string, "false")
+    learned_cidrs_approval_mode              = optional(string, null)
+    approved_learned_cidrs                   = optional(list(string), null)
     external_lb_rules = optional(list(object({
-      name           = string # Rule identifier (used in resource/PAN-OS object names)
-      frontend_port  = number # Port on the ELB (client-facing)
-      backend_port   = number # Port on the workload (DNAT destination port)
-      destination_ip = string # Workload IP (DNAT destination address)
+      name           = string
+      frontend_port  = number
+      backend_port   = number
+      destination_ip = string
       health_check   = optional(bool, false)
     })), [])
-    # Firewall IP configuration for automated bootstrap
-    # When set, static IPs are assigned and bootstrap.xml is rendered per-firewall
-    # Auto-populated with defaults when fw_amount > 0
     fw_ip_config = optional(object({
-      egress_ip_start = optional(number, 4) # cidrhost offset for first FW in egress subnet
-      lan_ip_start    = optional(number, 4) # cidrhost offset for first FW in LAN subnet
+      egress_ip_start = optional(number, 4)
+      lan_ip_start    = optional(number, 4)
     }), null)
   }))
   validation {
@@ -114,7 +106,7 @@ variable "transits" {
       for t in var.transits :
       t.cloud_router_asn >= 64512 && t.cloud_router_asn <= 65534 || t.cloud_router_asn == 16550
     ])
-    error_message = "cloud_router_asn must be a private ASN between 64512 and 6553 or 16550"
+    error_message = "cloud_router_asn must be a private ASN between 64512 and 65534 or 16550."
   }
   validation {
     condition = alltrue([
@@ -151,6 +143,33 @@ variable "transits" {
   }
 }
 
+variable "ncc_hubs" {
+  description = "List of NCC hubs to create or use existing."
+  type = list(object({
+    name                 = string
+    create               = optional(bool, true)
+    preset_topology      = optional(string, "STAR")
+    existing_vpc_name    = optional(string)
+    existing_vpc_project = optional(string)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for hub in var.ncc_hubs : contains(["STAR", "MESH"], hub.preset_topology)
+    ])
+    error_message = "Each hub's preset_topology must be 'STAR' or 'MESH'."
+  }
+
+  validation {
+    condition = alltrue([
+      for hub in var.ncc_hubs :
+      hub.create || (hub.existing_vpc_name != null && hub.existing_vpc_name != "")
+    ])
+    error_message = "When create = false, existing_vpc_name must be provided."
+  }
+}
+
 variable "spokes" {
   description = "List of spoke VPC configurations to attach to NCC hubs."
   type = list(object({
@@ -178,7 +197,7 @@ variable "spokes" {
 }
 
 variable "aviatrix_spokes" {
-  description = "Map of Aviatrix spoke gateway configurations keyed by the spoke name. Note: BGP is NOT supported for GCP spoke gateways."
+  description = "Map of Aviatrix spoke gateway configurations keyed by the spoke name."
   type = map(object({
     account                          = string
     region                           = string
@@ -195,66 +214,35 @@ variable "aviatrix_spokes" {
     single_ip_snat                   = optional(bool, false)
     transit_gw_name                  = string
   }))
-
   default = {}
-}
-
-variable "ncc_hubs" {
-  description = "List of NCC hubs to create or use existing"
-  type = list(object({
-    name            = string
-    create          = optional(bool, true)
-    preset_topology = optional(string, "STAR")
-    # For existing VPC (when create = false)
-    existing_vpc_name    = optional(string)
-    existing_vpc_project = optional(string) # Defaults to project_id if not specified
-  }))
-  default = []
-
-  validation {
-    condition = alltrue([
-      for hub in var.ncc_hubs : contains(["STAR", "MESH"], hub.preset_topology)
-    ])
-    error_message = "Each hub's preset_topology must be 'STAR' or 'MESH'."
-  }
-
-  validation {
-    condition = alltrue([
-      for hub in var.ncc_hubs :
-      hub.create || (hub.existing_vpc_name != null && hub.existing_vpc_name != "")
-    ])
-    error_message = "When create = false, existing_vpc_name must be provided."
-  }
 }
 
 variable "external_devices" {
   description = "Map of external devices to connect to Aviatrix Transit Gateways via IPSec."
   type = map(object({
-    transit_gw_name           = string
-    connection_name           = string
-    remote_gateway_ip         = string
-    bgp_enabled               = bool
-    bgp_remote_asn            = optional(string)
-    local_tunnel_cidr         = optional(string)
-    remote_tunnel_cidr        = optional(string)
-    ha_enabled                = bool
-    backup_remote_gateway_ip  = optional(string)
-    backup_local_tunnel_cidr  = optional(string)
-    backup_remote_tunnel_cidr = optional(string)
-    enable_ikev2              = optional(bool)
-    inspected_by_firenet      = bool
-    # Custom IPsec algorithm parameters
-    custom_algorithms       = optional(bool, false)
-    pre_shared_key          = optional(string)
-    backup_pre_shared_key   = optional(string)
-    phase_1_authentication  = optional(string)
-    phase_1_dh_groups       = optional(string)
-    phase_1_encryption      = optional(string)
-    phase_2_authentication  = optional(string)
-    phase_2_dh_groups       = optional(string)
-    phase_2_encryption      = optional(string)
-    phase1_local_identifier = optional(string)
-    # BGP learned CIDRs and manual advertisement parameters
+    transit_gw_name               = string
+    connection_name               = string
+    remote_gateway_ip             = string
+    bgp_enabled                   = bool
+    bgp_remote_asn                = optional(string)
+    local_tunnel_cidr             = optional(string)
+    remote_tunnel_cidr            = optional(string)
+    ha_enabled                    = bool
+    backup_remote_gateway_ip      = optional(string)
+    backup_local_tunnel_cidr      = optional(string)
+    backup_remote_tunnel_cidr     = optional(string)
+    enable_ikev2                  = optional(bool)
+    inspected_by_firenet          = bool
+    custom_algorithms             = optional(bool, false)
+    pre_shared_key                = optional(string)
+    backup_pre_shared_key         = optional(string)
+    phase_1_authentication        = optional(string)
+    phase_1_dh_groups             = optional(string)
+    phase_1_encryption            = optional(string)
+    phase_2_authentication        = optional(string)
+    phase_2_dh_groups             = optional(string)
+    phase_2_encryption            = optional(string)
+    phase1_local_identifier       = optional(string)
     enable_learned_cidrs_approval = optional(bool, false)
     approved_cidrs                = optional(set(string))
     manual_bgp_advertised_cidrs   = optional(list(string))

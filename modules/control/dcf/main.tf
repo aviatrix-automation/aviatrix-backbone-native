@@ -16,9 +16,9 @@ locals {
   # specific domain wins when one domain name is a substring of another (e.g.
   # "non-prod" must be evaluated before "prod" so that external-non-prod-* is
   # not incorrectly matched to the shorter "prod" domain).
-  s2c_requested_domains     = distinct([for k, v in var.smarties : v.s2c_domain if v.s2c_domain != null])
-  s2c_domain_length_keyed   = [for d in local.s2c_requested_domains : "${format("%03d", length(d))}${d}"]
-  s2c_domain_sorted         = [for s in reverse(sort(local.s2c_domain_length_keyed)) : substr(s, 3, -1)]
+  s2c_requested_domains   = distinct([for k, v in var.smarties : v.s2c_domain if v.s2c_domain != null])
+  s2c_domain_length_keyed = [for d in local.s2c_requested_domains : "${format("%03d", length(d))}${d}"]
+  s2c_domain_sorted       = [for s in reverse(sort(local.s2c_domain_length_keyed)) : substr(s, 3, -1)]
 
   # Assign each connection to the single best-matching (longest) domain.
   s2c_connection_domain = {

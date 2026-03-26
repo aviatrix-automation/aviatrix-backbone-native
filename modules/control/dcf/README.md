@@ -36,7 +36,7 @@ This workaround prevents a full ruleset diff and ensures Terraform only shows ch
 
 ```hcl
 module "dcf" {
-  source = "./modules/control/dcf"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/dcf?ref=v0.8.0"
 
   aws_ssm_region                = "us-east-1"
   enable_distributed_firewalling = true
@@ -117,7 +117,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_aws_ssw_region"></a> [aws\_ssw\_region](#input\_aws\_ssw\_region) | AWS region for SSM parameter retrieval | `string` | n/a | yes |
+| <a name="input_aws_ssm_region"></a> [aws\_ssm\_region](#input\_aws\_ssm\_region) | AWS region for SSM parameter retrieval | `string` | n/a | yes |
 | <a name="input_enable_distributed_firewalling"></a> [enable\_distributed\_firewalling](#input\_enable\_distributed\_firewalling) | Enable or disable Distributed Cloud Firewall globally | `bool` | `false` | no |
 | <a name="input_distributed_firewalling_default_action_rule_action"></a> [distributed\_firewalling\_default\_action\_rule\_action](#input\_distributed\_firewalling\_default\_action\_rule\_action) | Default action for traffic that does not match any policy. `PERMIT` or `DENY` | `string` | `"DENY"` | no |
 | <a name="input_distributed_firewalling_default_action_rule_logging"></a> [distributed\_firewalling\_default\_action\_rule\_logging](#input\_distributed\_firewalling\_default\_action\_rule\_logging) | Enable logging for the default action rule | `bool` | `false` | no |

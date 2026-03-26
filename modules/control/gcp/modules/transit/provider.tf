@@ -1,12 +1,18 @@
-# Updated on May 22, 2025 at 04:11 PM EDT
 terraform {
+  required_version = ">= 1.3"
+
   required_providers {
     aviatrix = {
       source  = "AviatrixSystems/aviatrix"
-      version = "8.2.0"
+      version = "~> 8.2"
+    }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
     google = {
-      source = "hashicorp/google"
+      source  = "hashicorp/google"
+      version = "~> 5.0"
     }
   }
 }

@@ -36,9 +36,9 @@ The module automatically discovers all transit gateways via the Aviatrix control
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.0 |
-| aviatrix | 8.2.0 |
-| aws | >= 4.0 |
+| terraform | >= 1.3 |
+| aviatrix | ~> 8.2 |
+| aws | ~> 5.0 |
 
 ## Providers
 
@@ -91,7 +91,7 @@ The module automatically discovers all transit gateways via the Aviatrix control
 
 ```hcl
 module "peering" {
-  source = "git::https://github.com/org/repo.git//modules/control/peering"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/peering?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 }
@@ -101,7 +101,7 @@ module "peering" {
 
 ```hcl
 module "peering" {
-  source = "git::https://github.com/org/repo.git//modules/control/peering"
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/peering?ref=v0.8.0"
 
   aws_ssm_region = "us-east-1"
 
