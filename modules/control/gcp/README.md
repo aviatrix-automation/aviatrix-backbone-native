@@ -46,14 +46,32 @@ The module provides:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Usage
+
+```hcl
+module "gcp_transit" {
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/gcp?ref=v0.8.0"
+
+  aws_ssm_region   = "us-east-1"
+  project_id       = "my-gcp-project"
+  ncc_hubs         = var.ncc_hubs
+  transits         = var.transits
+  spokes           = var.spokes
+  aviatrix_spokes  = var.aviatrix_spokes
+  external_devices = var.external_devices
+}
+```
+
+See [examples/gcp/](../../../examples/gcp/) for a complete configuration example with `.tfvars.example`.
+
 ## Requirements
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.0 |
-| aviatrix | >= 3.0 |
-| google | >= 4.0 |
-| aws | >= 4.0 |
+| terraform | >= 1.3 |
+| aviatrix | ~> 8.2 |
+| google | ~> 5.0 |
+| aws | ~> 5.0 |
 
 ## Providers
 
@@ -92,9 +110,11 @@ The module provides:
 |------|-------------|------|:--------:|
 | aws_ssm_region | AWS region for SSM parameter retrieval | `string` | yes |
 | project_id | GCP project ID for NCC hubs and bootstrap storage | `string` | yes |
-| ncc_hubs | List of NCC hubs to create | `list(object)` | no |
+| ncc_hubs | List of NCC hubs to create or use existing | `list(object)` | no |
 | transits | List of transit gateway configurations | `list(object)` | yes |
-| spokes | List of spoke VPC configurations | `list(object)` | no |
+| spokes | List of spoke VPC configurations for NCC | `list(object)` | no |
+| aviatrix_spokes | Map of Aviatrix spoke gateway configurations | `map(object)` | no |
+| external_devices | Map of external device IPSec connections | `map(object)` | no |
 
 ### NCC Hub Configuration
 
@@ -152,7 +172,9 @@ spokes = [
 
 ## Outputs
 
-No outputs currently defined.
+| Name | Description |
+|------|-------------|
+| external_lb_ip_addresses | Map of transit gateway name to external Application LB public IP address |
 
 ## Notes
 

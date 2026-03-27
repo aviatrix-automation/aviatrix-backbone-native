@@ -50,14 +50,35 @@ The module provides:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Usage
+
+```hcl
+module "azure_transit" {
+  source = "git::https://github.com/aviatrix-automation/aviatrix-backbone-native.git//modules/control/azure?ref=v0.8.0"
+
+  aws_ssm_region   = "us-east-1"
+  region           = "East US 2"
+  subscription_id  = "your-subscription-id"
+  tags             = { Environment = "production" }
+  transits         = var.transits
+  spokes           = var.spokes
+  vwan_configs     = var.vwan_configs
+  vwan_hubs        = var.vwan_hubs
+  vnets            = var.vnets
+  external_devices = var.external_devices
+}
+```
+
+See [examples/azure/](../../../examples/azure/) for a complete configuration example with `.tfvars.example`.
+
 ## Requirements
 
 | Name | Version |
 |------|---------|
-| terraform | >= 1.0 |
-| aviatrix | >= 3.0 |
-| azurerm | >= 3.0 |
-| aws | >= 4.0 |
+| terraform | >= 1.3 |
+| aviatrix | ~> 8.2 |
+| azurerm | ~> 3.0 |
+| aws | ~> 5.0 |
 
 ## Providers
 
@@ -111,6 +132,7 @@ The module provides:
 | transits | Map of transit gateway configurations | `map(object)` | no |
 | spokes | Map of spoke gateway configurations | `map(object)` | no |
 | vnets | Map of VNET configurations | `map(object)` | no |
+| external_devices | Map of external device connections | `map(object)` | no |
 | tags | Map of tags to apply to all resources | `map(string)` | no |
 
 ### Virtual WAN Configuration

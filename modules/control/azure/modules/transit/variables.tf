@@ -78,7 +78,7 @@ variable "transits" {
     lan_source_ranges      = optional(list(string), ["0.0.0.0/0"])
     enable_password_auth   = optional(bool, false)
     admin_username         = optional(string, "panadmin")
-    admin_password         = optional(string, "Avtx1234#")
+    admin_password         = optional(string)
     bootstrap_type         = optional(string, "file_share") # "file_share" or "panorama"
     # Per-transit Panorama overrides (uses global panorama_config if not set)
     panorama_dgname  = optional(string) # Override device group for this transit
@@ -98,11 +98,11 @@ variable "transits" {
     learned_cidrs_approval_mode = optional(string, null)
     approved_learned_cidrs      = optional(list(string), null)
     vwan_connections = optional(list(object({
-      vwan_name                         = string
-      vwan_hub_name                     = string
-      enable_learned_cidrs_approval     = optional(bool, false)
-      approved_cidrs                    = optional(set(string), [])
-      manual_bgp_advertised_cidrs       = optional(list(string))
+      vwan_name                     = string
+      vwan_hub_name                 = string
+      enable_learned_cidrs_approval = optional(bool, false)
+      approved_cidrs                = optional(set(string), [])
+      manual_bgp_advertised_cidrs   = optional(list(string))
     })))
   }))
   default = {}
@@ -137,11 +137,11 @@ variable "spokes" {
     enable_max_performance           = optional(bool, true)   # Enable maximum performance for spoke gateway
     disable_route_propagation        = optional(bool, false)  # Disable route propagation on spoke subnets
     vwan_connections = optional(list(object({
-      vwan_name                         = string
-      vwan_hub_name                     = string
-      enable_learned_cidrs_approval     = optional(bool, false)
-      approved_cidrs                    = optional(set(string), [])
-      manual_bgp_advertised_cidrs       = optional(list(string))
+      vwan_name                     = string
+      vwan_hub_name                 = string
+      enable_learned_cidrs_approval = optional(bool, false)
+      approved_cidrs                = optional(set(string), [])
+      manual_bgp_advertised_cidrs   = optional(list(string))
     })))
   }))
   default = {}
@@ -189,7 +189,7 @@ variable "panorama_config" {
 
 variable "external_devices" {
   description = "Map of external devices to connect to Aviatrix Transit Gateways via IPSec."
-  type        = map(object({
+  type = map(object({
     transit_key               = string
     connection_name           = string
     remote_gateway_ip         = string
@@ -204,16 +204,16 @@ variable "external_devices" {
     enable_ikev2              = optional(bool)
     inspected_by_firenet      = bool
     # Custom IPsec algorithm parameters
-    custom_algorithms         = optional(bool, false)
-    pre_shared_key            = optional(string)
-    backup_pre_shared_key     = optional(string)
-    phase_1_authentication    = optional(string)
-    phase_1_dh_groups         = optional(string)
-    phase_1_encryption        = optional(string)
-    phase_2_authentication    = optional(string)
-    phase_2_dh_groups         = optional(string)
-    phase_2_encryption        = optional(string)
-    phase1_local_identifier   = optional(string)
+    custom_algorithms       = optional(bool, false)
+    pre_shared_key          = optional(string)
+    backup_pre_shared_key   = optional(string)
+    phase_1_authentication  = optional(string)
+    phase_1_dh_groups       = optional(string)
+    phase_1_encryption      = optional(string)
+    phase_2_authentication  = optional(string)
+    phase_2_dh_groups       = optional(string)
+    phase_2_encryption      = optional(string)
+    phase1_local_identifier = optional(string)
     # BGP learned CIDRs and manual advertisement parameters
     enable_learned_cidrs_approval = optional(bool, false)
     approved_cidrs                = optional(set(string))

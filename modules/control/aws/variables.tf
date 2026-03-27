@@ -1,6 +1,10 @@
-
 variable "aws_ssm_region" {
   description = "AWS SSM region for parameter retrieval."
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region for resource deployment."
   type        = string
 }
 
@@ -10,22 +14,15 @@ variable "tags" {
   default     = {}
 }
 
-
-variable "region" {
-  description = "AWS region for resource deployment."
-  type        = string
-}
-
 variable "transits" {
   description = "Map of transit gateway configurations."
   type = map(object({
-    account                     = string
-    cidr                        = string
-    instance_size               = string
-    local_as_number             = number
-    manual_bgp_advertised_cidrs = optional(set(string), [])
-    tgw_connection_cidrs        = optional(map(set(string)), {})
-    # Per-connection learned CIDR approval (key = tgw_name or connection_name)
+    account                              = string
+    cidr                                 = string
+    instance_size                        = string
+    local_as_number                      = number
+    manual_bgp_advertised_cidrs          = optional(set(string), [])
+    tgw_connection_cidrs                 = optional(map(set(string)), {})
     tgw_connection_learned_cidr_approval = optional(map(bool), {})
     tgw_connection_approved_cidrs        = optional(map(set(string)), {})
     fw_amount                            = optional(number, 0)
@@ -41,10 +38,9 @@ variable "transits" {
     mgmt_source_ranges                   = optional(set(string), ["0.0.0.0/0"])
     egress_source_ranges                 = optional(set(string), ["0.0.0.0/0"])
     lan_source_ranges                    = optional(set(string), ["0.0.0.0/0"])
-    # Learned CIDRs approval configuration
-    learned_cidr_approval       = optional(string, "false")
-    learned_cidrs_approval_mode = optional(string, null)
-    approved_learned_cidrs      = optional(list(string), null)
+    learned_cidr_approval                = optional(string, "false")
+    learned_cidrs_approval_mode          = optional(string, null)
+    approved_learned_cidrs               = optional(list(string), null)
     inside_cidr_blocks = optional(map(object({
       connect_peer_1    = string
       ha_connect_peer_1 = string
@@ -81,31 +77,29 @@ variable "tgws" {
 variable "external_devices" {
   description = "Map of external devices to connect to Aviatrix Transit Gateways."
   type = map(object({
-    transit_key               = string
-    connection_name           = string
-    remote_gateway_ip         = string
-    bgp_enabled               = bool
-    bgp_remote_asn            = optional(string)
-    local_tunnel_cidr         = optional(string)
-    remote_tunnel_cidr        = optional(string)
-    ha_enabled                = bool
-    backup_remote_gateway_ip  = optional(string)
-    backup_local_tunnel_cidr  = optional(string)
-    backup_remote_tunnel_cidr = optional(string)
-    enable_ikev2              = optional(bool)
-    inspected_by_firenet      = bool
-    # Custom IPsec algorithm parameters
-    custom_algorithms       = optional(bool, false)
-    pre_shared_key          = optional(string)
-    backup_pre_shared_key   = optional(string)
-    phase_1_authentication  = optional(string)
-    phase_1_dh_groups       = optional(string)
-    phase_1_encryption      = optional(string)
-    phase_2_authentication  = optional(string)
-    phase_2_dh_groups       = optional(string)
-    phase_2_encryption      = optional(string)
-    phase1_local_identifier = optional(string)
-    # BGP learned CIDRs and manual advertisement parameters
+    transit_key                   = string
+    connection_name               = string
+    remote_gateway_ip             = string
+    bgp_enabled                   = bool
+    bgp_remote_asn                = optional(string)
+    local_tunnel_cidr             = optional(string)
+    remote_tunnel_cidr            = optional(string)
+    ha_enabled                    = bool
+    backup_remote_gateway_ip      = optional(string)
+    backup_local_tunnel_cidr      = optional(string)
+    backup_remote_tunnel_cidr     = optional(string)
+    enable_ikev2                  = optional(bool)
+    inspected_by_firenet          = bool
+    custom_algorithms             = optional(bool, false)
+    pre_shared_key                = optional(string)
+    backup_pre_shared_key         = optional(string)
+    phase_1_authentication        = optional(string)
+    phase_1_dh_groups             = optional(string)
+    phase_1_encryption            = optional(string)
+    phase_2_authentication        = optional(string)
+    phase_2_dh_groups             = optional(string)
+    phase_2_encryption            = optional(string)
+    phase1_local_identifier       = optional(string)
     enable_learned_cidrs_approval = optional(bool, false)
     approved_cidrs                = optional(set(string))
     manual_bgp_advertised_cidrs   = optional(list(string))
@@ -137,6 +131,5 @@ variable "spokes" {
     single_ip_snat                   = optional(bool, false)
     transit_key                      = string
   }))
-
   default = {}
 }

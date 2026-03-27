@@ -1,0 +1,57 @@
+directory:
+  - modules/
+
+skip-path:
+  - .terraform
+
+skip-check:
+  # CKV_AWS_41: SSM parameter references are mistaken for hardcoded credentials.
+  # All provider auth uses data.aws_ssm_parameter lookups, not literal values.
+  - CKV_AWS_41
+
+  # CKV_TF_1/2: Registry modules use version constraints (e.g. "~> 8.2"), which is
+  # correct for Terraform registry sources. Commit hashes and git tags only apply
+  # to git-sourced modules; they are not valid for registry module sources.
+  - CKV_TF_1
+  - CKV_TF_2
+
+  # CKV_AWS_331: TGW auto_accept_shared_attachments = "enable" is required for the
+  # transit architecture — Aviatrix-managed spokes attach automatically.
+  - CKV_AWS_331
+
+  # CKV_AWS_149: Secrets Manager secrets store generated TLS key pairs for PAN-OS.
+  # AWS-managed KMS encryption is acceptable; a CMK would add operational overhead.
+  - CKV_AWS_149
+
+  # CKV_GCP_26: Subnet flow logs are intentionally excluded from Terraform management
+  # (lifecycle ignore_changes = [log_config]) — enabled separately per environment.
+  - CKV_GCP_26
+
+  # CKV_GCP_74: private_ip_google_access is not required for transit/firewall subnets
+  # (bgp_lan, mgmt, egress) which route traffic through the Aviatrix gateway.
+  - CKV_GCP_74
+
+  # CKV_AZURE_182/183: Transit VNETs do not use custom DNS servers by design —
+  # DNS resolution for workloads happens in spoke VNETs, not the transit.
+  - CKV_AZURE_182
+  - CKV_AZURE_183
+
+  # PAN-OS firewall security groups/NSGs/rules — these are intentionally permissive.
+  # All three clouds deploy firewall interfaces (mgmt, egress, LAN) that must allow
+  # the traffic they inspect. Source ranges are controlled via input variables.
+  - CKV_AWS_23
+  - CKV_AWS_24
+  - CKV_AWS_25
+  - CKV_AWS_260
+  - CKV_AWS_277
+  - CKV_AWS_382
+  - CKV_AZURE_9
+  - CKV_AZURE_10
+  - CKV_AZURE_77
+  - CKV_AZURE_160
+  - CKV_GCP_2
+  - CKV_GCP_3
+  - CKV_GCP_75
+  - CKV_GCP_77
+  - CKV_GCP_88
+  - CKV_GCP_106
