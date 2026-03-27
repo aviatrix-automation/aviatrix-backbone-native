@@ -32,8 +32,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install tfsec
+        env:
+          TFSEC_VERSION: "1.28.14"
+          TFSEC_CHECKSUM: "a32d0799bbefababaa4fcd814da9f4d251cd932789590b99d1d5fcb89ace6f68"
         run: |
-          wget -q https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64
+          wget -q "https://github.com/aquasecurity/tfsec/releases/download/v${TFSEC_VERSION}/tfsec-linux-amd64"
+          echo "${TFSEC_CHECKSUM}  tfsec-linux-amd64" | sha256sum --check
           chmod +x tfsec-linux-amd64
           sudo mv tfsec-linux-amd64 /usr/local/bin/tfsec
           tfsec --version
@@ -78,6 +82,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Trivy
+        # apt install uses the signed Aqua Security repo — GPG verification is
+        # handled by apt itself, no separate checksum step needed.
         run: |
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
