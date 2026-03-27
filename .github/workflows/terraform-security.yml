@@ -82,13 +82,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Trivy
-        # apt install uses the signed Aqua Security repo — GPG verification is
-        # handled by apt itself, no separate checksum step needed.
+        env:
+          TRIVY_VERSION: "0.69.3"
+          TRIVY_CHECKSUM: "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
         run: |
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_CHECKSUM}  trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | sha256sum --check
+          tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
+          sudo mv trivy /usr/local/bin/trivy
           trivy --version
 
       - name: Run Trivy
