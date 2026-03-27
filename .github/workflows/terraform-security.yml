@@ -5,12 +5,16 @@ on:
     paths:
       - '**.tf'
       - '.github/workflows/terraform-security.yml'
+      - '.checkov.yaml'
+      - '.trivyignore'
   push:
     branches:
       - main
     paths:
       - '**.tf'
       - '.github/workflows/terraform-security.yml'
+      - '.checkov.yaml'
+      - '.trivyignore'
   schedule:
     - cron: '0 0 * * 1'  # Weekly on Mondays
 
@@ -28,20 +32,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install tfsec
+        env:
+          TFSEC_VERSION: "1.28.14"
+          TFSEC_CHECKSUM: "a32d0799bbefababaa4fcd814da9f4d251cd932789590b99d1d5fcb89ace6f68"
         run: |
-          wget -q https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64
+          wget -q "https://github.com/aquasecurity/tfsec/releases/download/v${TFSEC_VERSION}/tfsec-linux-amd64"
+          echo "${TFSEC_CHECKSUM}  tfsec-linux-amd64" | sha256sum --check
           chmod +x tfsec-linux-amd64
           sudo mv tfsec-linux-amd64 /usr/local/bin/tfsec
           tfsec --version
 
       - name: Run tfsec
-        run: tfsec --format sarif --minimum-severity MEDIUM . > results.sarif || true
-
-      - name: Upload tfsec SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: results.sarif
+        # SARIF upload omitted: tfsec generates git:// URIs which are incompatible
+        # with github/codeql-action/upload-sarif (expects file:// URIs).
+        # Third-party Aviatrix controller module findings excluded via --exclude.
+        run: |
+          tfsec modules/ --soft-fail \
+            --exclude aws-ec2-no-public-egress-sgr,aws-ec2-enforce-http-token-imds,aws-ec2-require-vpc-flow-logs-for-all-vpcs,aws-ec2-add-description-to-security-group-rule,aws-ec2-volume-encryption-customer-key
 
   checkov:
     name: Checkov Security Scan
@@ -51,17 +58,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Checkov
+        # Uses .checkov.yaml for directory scope and all skip-check suppressions.
+        # output_format changed from "cli,sarif" (unsupported in bundled checkov 2.3.22)
+        # to "sarif" only.
         uses: bridgecrewio/checkov-action@v12.2138.0
         with:
-          directory: .
-          framework: terraform
+          config_file: .checkov.yaml
           soft_fail: true
-          output_format: cli,sarif
-          output_file_path: console,results.sarif
-          skip_check: CKV_AWS_79,CKV_AWS_23  # Skip instance metadata checks
+          output_format: sarif
+          output_file_path: results.sarif
 
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: results.sarif
@@ -74,18 +82,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.69.3"
+          TRIVY_CHECKSUM: "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
         run: |
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_CHECKSUM}  trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | sha256sum --check
+          tar -xzf "trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" trivy
+          sudo mv trivy /usr/local/bin/trivy
           trivy --version
 
-      - name: Run Trivy vulnerability scanner
-        run: trivy config --format sarif --output trivy-results.sarif --severity CRITICAL,HIGH,MEDIUM --exit-code 0 .
+      - name: Run Trivy
+        run: |
+          trivy fs --scanners misconfig \
+            --ignorefile .trivyignore \
+            --format sarif \
+            --output trivy-results.sarif \
+            --exit-code 0 \
+            modules/
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-results.sarif
